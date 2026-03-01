@@ -1,0 +1,40 @@
+<style>
+    nav {
+        background-color: #0f0f1d;
+        padding: 0 40px;
+        border-bottom: 1px solid #33334d;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 60px;
+    }
+    .nav-links {
+        display: flex;
+        gap: 15px;
+    }
+    .nav-links a {
+        color: #e0e0e0;
+        text-decoration: none;
+        font-weight: bold;
+        padding: 20px 15px;
+        transition: all 0.3s ease-in-out;
+        border-bottom: 3px solid transparent;
+    }
+    .nav-links a:hover {
+        color: #ffffff;
+        border-bottom-color: #e94560;
+    }
+    .nav-links a.active {
+        color: #ffffff;
+        border-bottom-color: #e94560;
+    }
+</style>
+
+<nav>
+    <div class="nav-links">
+        <a href="/scanpack" class="{% if active_page == 'scan' %}active{% endif %}">Scan and Pack</a>
+        <a href="/markpaid" class="{% if active_page == 'paid' %}active{% endif %}">Mark as Paid</a>
+        <a href="/returned" class="{% if active_page == 'returned' %}active{% endif %}">Mark as Returned</a>
+        <a href="/stock" class="{% if active_page == 'stock' %}active{% endif %}">Stock App</a>
+    </div>
+</nav>

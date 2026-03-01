@@ -1,0 +1,9 @@
+# Never commit these
+config.txt
+.env
+venv/
+dist/
+build/
+*.spec
+__pycache__/
+*.pyc

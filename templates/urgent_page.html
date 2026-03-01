@@ -1,0 +1,25 @@
+{% extends "stock_base.html" %}
+
+{% block content %}
+<div class="page-title">
+    <h1>⚠ Urgent — Negative Stock</h1>
+    <p>Products with negative inventory that need immediate attention</p>
+</div>
+
+<div class="product-grid">
+    {% for product in products %}
+        <div class="product-card urgent">
+            <img src="{{ product.image_url if product.image_url else 'https://via.placeholder.com/300/1a1a2e/e94560?text=No+Image' }}" alt="{{ product.title }}">
+            <div class="product-card-body">
+                <h5>{{ product.title }}</h5>
+                <div class="needed-qty">Needed: {{ product.needed_qty }}</div>
+                <div class="stock-info">Current Stock: {{ product.current_qty }}</div>
+            </div>
+        </div>
+    {% else %}
+        <div class="empty-alert success">
+            ✅ No products have negative stock levels. All good!
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

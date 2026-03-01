@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }} - Stock App</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style4.css') }}">
+</head>
+<body>
+
+    <header class="app-header">
+        <h1>Stock App</h1>
+    </header>
+
+    <main class="app-main">
+        <!-- Internal stock app navigation (category tabs) -->
+        <nav class="stock-nav">
+            <a href="/stock" class="{% if active_stock == 'urgent' %}active{% endif %}">⚠ Urgent</a>
+            <a href="/stock/simple" class="{% if active_stock == 'simple' %}active{% endif %}">Simple</a>
+            <a href="/stock/2-button" class="{% if active_stock == '2-button' %}active{% endif %}">2 Button</a>
+            <a href="/stock/7-button" class="{% if active_stock == '7-button' %}active{% endif %}">7 Button</a>
+            <a href="/stock/quilt" class="{% if active_stock == 'quilt' %}active{% endif %}">Quilt</a>
+        </nav>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="app-footer">
+        {% include 'navigation.html' %}
+    </footer>
+
+</body>
+</html>
