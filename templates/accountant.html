@@ -835,22 +835,18 @@ function renderChart(filtered) {
         dateMap[e.display][e.type] += e.earnings;
     });
     const labels = Object.keys(dateMap);
-    const lineDatasets = ['packed','returned','po','custom'].map(t => ({
+    const datasets = ['packed','returned','po','custom'].map(t => ({
         label: TYPE_LABELS[t],
         data: labels.map(l => dateMap[l][t] || 0),
+        backgroundColor: TYPE_COLORS[t] + '99',
         borderColor: TYPE_COLORS[t],
-        backgroundColor: TYPE_COLORS[t] + '18',
-        borderWidth: 2.5,
-        fill: true,
-        tension: 0.4,
-        pointBackgroundColor: TYPE_COLORS[t],
-        pointRadius: 4,
-        pointHoverRadius: 6,
+        borderWidth: 1.5,
+        borderRadius: 4,
     }));
 
     chart = new Chart(document.getElementById('mainChart'), {
-        type: 'line',
-        data: { labels, datasets: lineDatasets },
+        type: 'bar',
+        data: { labels, datasets },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
@@ -866,8 +862,8 @@ function renderChart(filtered) {
                 }
             },
             scales: {
-                x: { ticks: { color: '#b0b0b0', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                y: { ticks: { color: '#b0b0b0', font: { size: 10 }, callback: v => 'Rs.' + v }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                x: { stacked: true, ticks: { color: '#b0b0b0', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { stacked: true, ticks: { color: '#b0b0b0', font: { size: 10 }, callback: v => 'Rs.' + v }, grid: { color: 'rgba(255,255,255,0.04)' } }
             }
         }
     });

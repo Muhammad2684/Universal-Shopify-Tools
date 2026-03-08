@@ -7,6 +7,7 @@
         align-items: center;
         justify-content: center;
         height: 60px;
+        position: relative;
     }
     .nav-links {
         display: flex;
@@ -20,23 +21,463 @@
         transition: all 0.3s ease-in-out;
         border-bottom: 3px solid transparent;
     }
-    .nav-links a:hover {
-        color: #ffffff;
-        border-bottom-color: #e94560;
+    .nav-links a:hover { color: #ffffff; border-bottom-color: #e94560; }
+    .nav-links a.active { color: #ffffff; border-bottom-color: #e94560; }
+
+    /* ── Store switcher floating button ── */
+    .store-fab {
+        position: fixed;
+        bottom: 70px;
+        right: 20px;
+        z-index: 999;
+        background-color: #e94560;
+        color: #fff;
+        border: none;
+        border-radius: 50px;
+        padding: 10px 16px;
+        font-size: 0.85em;
+        font-weight: bold;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(233,69,96,0.5);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: transform 0.2s, filter 0.2s;
     }
-    .nav-links a.active {
-        color: #ffffff;
-        border-bottom-color: #e94560;
+    .store-fab:hover { filter: brightness(1.15); transform: translateY(-2px); }
+    .store-fab .fab-store-name {
+        max-width: 140px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
+
+    /* ── Modal overlay ── */
+    .profiles-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.6);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+    .profiles-overlay.open { display: flex; }
+
+    .profiles-modal {
+        background: #0f0f1d;
+        border: 1px solid #33334d;
+        border-radius: 14px;
+        width: 480px;
+        max-width: 95vw;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+        animation: modal-in 0.25s ease;
+    }
+    @keyframes modal-in {
+        from { transform: scale(0.95); opacity: 0; }
+        to   { transform: scale(1);    opacity: 1; }
+    }
+
+    .profiles-modal::-webkit-scrollbar { width: 6px; }
+    .profiles-modal::-webkit-scrollbar-thumb { background: #33334d; border-radius: 3px; }
+
+    .pm-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 18px 20px;
+        border-bottom: 1px solid #33334d;
+    }
+    .pm-header h2 { margin: 0; color: #e94560; font-size: 1.1em; }
+    .pm-close {
+        background: none;
+        border: none;
+        color: #b0b0b0;
+        font-size: 1.4em;
+        cursor: pointer;
+        padding: 0 4px;
+        line-height: 1;
+        transition: color 0.2s;
+    }
+    .pm-close:hover { color: #fff; }
+
+    .pm-body { padding: 16px 20px; }
+
+    /* Profile cards */
+    .profile-card {
+        background: #1a1a2e;
+        border: 1px solid #33334d;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transition: border-color 0.2s;
+    }
+    .profile-card.active-profile { border-color: #e94560; }
+    .profile-card-info { flex: 1; min-width: 0; }
+    .profile-card-name {
+        font-weight: bold;
+        color: #e0e0e0;
+        font-size: 0.95em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .profile-card-url {
+        font-size: 0.78em;
+        color: #b0b0b0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .profile-card-badge {
+        font-size: 0.72em;
+        background: #e94560;
+        color: #fff;
+        padding: 2px 8px;
+        border-radius: 10px;
+        white-space: nowrap;
+    }
+    .profile-actions { display: flex; gap: 6px; flex-shrink: 0; }
+    .btn-profile-action {
+        background: none;
+        border: 1px solid #44446b;
+        color: #b0b0b0;
+        border-radius: 5px;
+        padding: 4px 10px;
+        font-size: 0.78em;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+    .btn-profile-action:hover { border-color: #e94560; color: #e94560; }
+    .btn-profile-action.activate { border-color: #28a745; color: #28a745; }
+    .btn-profile-action.activate:hover { background: #28a745; color: #fff; }
+    .btn-profile-action.del { border-color: #dc3545; color: #dc3545; }
+    .btn-profile-action.del:hover { background: #dc3545; color: #fff; }
+
+    /* Add new profile form */
+    .pm-divider {
+        border: none;
+        border-top: 1px solid #33334d;
+        margin: 16px 0;
+    }
+    .pm-section-title {
+        font-size: 0.82em;
+        font-weight: bold;
+        color: #b0b0b0;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 12px;
+    }
+    .pm-form-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .pm-input {
+        width: 100%;
+        padding: 9px 12px;
+        background: #2b2b40;
+        border: 1px solid #44446b;
+        border-radius: 7px;
+        color: #e0e0e0;
+        font-size: 0.9em;
+        box-sizing: border-box;
+        transition: border-color 0.2s;
+    }
+    .pm-input:focus { outline: none; border-color: #e94560; }
+    .pm-input::placeholder { color: #666; }
+
+    .pm-row { display: flex; gap: 10px; }
+    .pm-row .pm-input { flex: 1; }
+
+    .btn-add-profile {
+        width: 100%;
+        padding: 11px;
+        background: #e94560;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.95em;
+        font-weight: bold;
+        cursor: pointer;
+        margin-top: 4px;
+        transition: filter 0.2s, transform 0.15s;
+    }
+    .btn-add-profile:hover { filter: brightness(1.12); transform: translateY(-1px); }
+
+    .pm-status {
+        font-size: 0.82em;
+        text-align: center;
+        margin-top: 8px;
+        min-height: 16px;
+        color: #b0b0b0;
+    }
+    .pm-status.ok   { color: #28a745; }
+    .pm-status.err  { color: #dc3545; }
+
+    /* Edit inline form */
+    .profile-edit-form {
+        background: #1a1a2e;
+        border: 1px solid #e94560;
+        border-radius: 10px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .edit-actions { display: flex; gap: 8px; margin-top: 4px; }
+    .btn-save-edit {
+        padding: 7px 16px;
+        background: #28a745;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85em;
+        font-weight: bold;
+        transition: filter 0.2s;
+    }
+    .btn-save-edit:hover { filter: brightness(1.1); }
+    .btn-cancel-edit {
+        padding: 7px 16px;
+        background: none;
+        color: #b0b0b0;
+        border: 1px solid #44446b;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.85em;
+        transition: all 0.15s;
+    }
+    .btn-cancel-edit:hover { border-color: #e94560; color: #e94560; }
 </style>
 
 <nav>
     <div class="nav-links">
-        <a href="/scanpack"    class="{% if active_page == 'scan'       %}active{% endif %}">Scan and Pack</a>
-        <a href="/markpaid"    class="{% if active_page == 'paid'       %}active{% endif %}">Mark as Paid</a>
-        <a href="/returned"    class="{% if active_page == 'returned'   %}active{% endif %}">Mark as Returned</a>
-        <a href="/stock"       class="{% if active_page == 'stock'      %}active{% endif %}">Stock App</a>
-        <a href="/deduct"      class="{% if active_page == 'deduct'     %}active{% endif %}">QTY Deduction</a>
-        <a href="/accountant"  class="{% if active_page == 'accountant' %}active{% endif %}">My Accountant</a>
+        <a href="/scanpack"  class="{% if active_page == 'scan'     %}active{% endif %}">Scan and Pack</a>
+        <a href="/markpaid"  class="{% if active_page == 'paid'     %}active{% endif %}">Mark as Paid</a>
+        <a href="/returned"  class="{% if active_page == 'returned' %}active{% endif %}">Mark as Returned</a>
+        <a href="/stock"     class="{% if active_page == 'stock'    %}active{% endif %}">Stock App</a>
+        <a href="/deduct"      class="{% if active_page == 'deduct'      %}active{% endif %}">QTY Deduction</a>
+        <a href="/accountant" class="{% if active_page == 'accountant' %}active{% endif %}">My Accountant</a>
     </div>
 </nav>
+
+<!-- Floating store switcher button -->
+<button class="store-fab" onclick="openProfilesModal()">
+     <span class="fab-store-name" id="fabStoreName">Loading...</span>
+</button>
+
+<!-- Profiles modal -->
+<div class="profiles-overlay" id="profilesOverlay" onclick="handleOverlayClick(event)">
+    <div class="profiles-modal">
+        <div class="pm-header">
+            <h2>Store Profiles</h2>
+            <button class="pm-close" onclick="closeProfilesModal()">✕</button>
+        </div>
+        <div class="pm-body">
+            <div id="profilesList"></div>
+
+            <hr class="pm-divider">
+            <div class="pm-section-title">Add New Profile</div>
+            <div class="pm-form-grid">
+                <input class="pm-input" id="newName"      placeholder="Profile name (e.g. Main Store)">
+                <input class="pm-input" id="newUrl"       placeholder="Store URL (e.g. your-store.myshopify.com)">
+                <input class="pm-input" id="newToken"     placeholder="Access Token" type="password">
+                <div class="pm-row">
+                    <input class="pm-input" id="newVersion"   placeholder="API Version (e.g. 2024-07)">
+                </div>
+                <div class="pm-row">
+                    <input class="pm-input" id="newNs"    placeholder="Metafield Namespace">
+                    <input class="pm-input" id="newKey"   placeholder="Metafield Key">
+                </div>
+                <button class="btn-add-profile" onclick="addProfile()">+ Add Profile</button>
+                <div class="pm-status" id="addStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    let profiles = [];
+    let activeId = null;
+
+    async function fetchProfiles() {
+        try {
+            const res = await fetch('/api/profiles');
+            const data = await res.json();
+            profiles = data.profiles || [];
+            activeId = data.active;
+            renderProfiles();
+            updateFab();
+        } catch(e) {
+            document.getElementById('fabStoreName').textContent = 'No store';
+        }
+    }
+
+    function updateFab() {
+        const active = profiles.find(p => p.id === activeId);
+        document.getElementById('fabStoreName').textContent = active ? active.name : 'No store';
+    }
+
+    function renderProfiles() {
+        const container = document.getElementById('profilesList');
+        if (!profiles.length) {
+            container.innerHTML = '<div style="color:#b0b0b0;font-size:0.88em;text-align:center;padding:10px 0;">No profiles yet. Add one below.</div>';
+            return;
+        }
+        container.innerHTML = '';
+        profiles.forEach(p => {
+            const isActive = p.id === activeId;
+            const card = document.createElement('div');
+            card.className = 'profile-card' + (isActive ? ' active-profile' : '');
+            card.dataset.id = p.id;
+            card.innerHTML = `
+                <div class="profile-card-info">
+                    <div class="profile-card-name">${escHtml(p.name)}</div>
+                    <div class="profile-card-url">${escHtml(p.store_url)}</div>
+                </div>
+                ${isActive ? '<span class="profile-card-badge">Active</span>' : ''}
+                <div class="profile-actions">
+                    ${!isActive ? `<button class="btn-profile-action activate" onclick="activateProfile('${p.id}')">Switch</button>` : ''}
+                    <button class="btn-profile-action" onclick="editProfile('${p.id}')">Edit</button>
+                    <button class="btn-profile-action del" onclick="deleteProfile('${p.id}')">Del</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    window.activateProfile = async function(id) {
+        const res = await fetch(`/api/profiles/${id}/activate`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            activeId = id;
+            renderProfiles();
+            updateFab();
+            // Clear session storage so modules reload fresh for new store
+            sessionStorage.clear();
+            showAddStatus('Switched to ' + data.name, 'ok');
+        }
+    };
+
+    window.deleteProfile = async function(id) {
+        if (!confirm('Delete this profile?')) return;
+        const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (data.success) { fetchProfiles(); }
+    };
+
+    window.editProfile = function(id) {
+        const p = profiles.find(x => x.id === id);
+        if (!p) return;
+        const container = document.getElementById('profilesList');
+        const card = container.querySelector(`[data-id="${id}"]`);
+
+        const form = document.createElement('div');
+        form.className = 'profile-edit-form';
+        form.innerHTML = `
+            <input class="pm-input" id="edit-name-${id}"    value="${escHtml(p.name)}"       placeholder="Profile name">
+            <input class="pm-input" id="edit-url-${id}"     value="${escHtml(p.store_url)}"  placeholder="Store URL">
+            <input class="pm-input" id="edit-token-${id}"   placeholder="New token (leave blank to keep)" type="password">
+            <div class="pm-row">
+                <input class="pm-input" id="edit-ver-${id}" value="${escHtml(p.api_version)}" placeholder="API Version">
+            </div>
+            <div class="pm-row">
+                <input class="pm-input" id="edit-ns-${id}"  value="${escHtml(p.metafield_namespace)}" placeholder="Metafield Namespace">
+                <input class="pm-input" id="edit-key-${id}" value="${escHtml(p.metafield_key)}"       placeholder="Metafield Key">
+            </div>
+            <div class="edit-actions">
+                <button class="btn-save-edit"   onclick="saveEdit('${id}')">Save</button>
+                <button class="btn-cancel-edit" onclick="fetchProfiles()">Cancel</button>
+            </div>
+        `;
+        card.replaceWith(form);
+    };
+
+    window.saveEdit = async function(id) {
+        const body = {
+            name:                document.getElementById(`edit-name-${id}`).value.trim(),
+            store_url:           document.getElementById(`edit-url-${id}`).value.trim(),
+            access_token:        document.getElementById(`edit-token-${id}`).value.trim(),
+            api_version:         document.getElementById(`edit-ver-${id}`).value.trim(),
+            metafield_namespace: document.getElementById(`edit-ns-${id}`).value.trim(),
+            metafield_key:       document.getElementById(`edit-key-${id}`).value.trim(),
+        };
+        const res = await fetch(`/api/profiles/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) { fetchProfiles(); }
+    };
+
+    window.addProfile = async function() {
+        const name    = document.getElementById('newName').value.trim();
+        const url     = document.getElementById('newUrl').value.trim();
+        const token   = document.getElementById('newToken').value.trim();
+        const version = document.getElementById('newVersion').value.trim() || '2024-07';
+        const ns      = document.getElementById('newNs').value.trim();
+        const key     = document.getElementById('newKey').value.trim();
+
+        if (!name || !url || !token) {
+            showAddStatus('Name, URL, and Token are required.', 'err');
+            return;
+        }
+
+        const res = await fetch('/api/profiles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, store_url: url, access_token: token, api_version: version, metafield_namespace: ns, metafield_key: key })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('newName').value    = '';
+            document.getElementById('newUrl').value     = '';
+            document.getElementById('newToken').value   = '';
+            document.getElementById('newVersion').value = '';
+            document.getElementById('newNs').value      = '';
+            document.getElementById('newKey').value     = '';
+            showAddStatus('Profile added!', 'ok');
+            fetchProfiles();
+        } else {
+            showAddStatus('Error adding profile.', 'err');
+        }
+    };
+
+    function showAddStatus(msg, type) {
+        const el = document.getElementById('addStatus');
+        el.textContent = msg;
+        el.className = 'pm-status ' + type;
+        setTimeout(() => { el.textContent = ''; el.className = 'pm-status'; }, 3000);
+    }
+
+    function escHtml(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    window.openProfilesModal = function() {
+        document.getElementById('profilesOverlay').classList.add('open');
+        fetchProfiles();
+    };
+
+    window.closeProfilesModal = function() {
+        document.getElementById('profilesOverlay').classList.remove('open');
+    };
+
+    window.handleOverlayClick = function(e) {
+        if (e.target === document.getElementById('profilesOverlay')) closeProfilesModal();
+    };
+
+    // Load on page init
+    fetchProfiles();
+})();
+</script>

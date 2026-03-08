@@ -3,7 +3,6 @@ import sys
 import json
 import threading
 import requests
-from datetime import datetime
 from flask import Flask, render_template, jsonify, request, abort
 
 # ── PyInstaller path resolution ──────────────────────────────────────────────
@@ -191,7 +190,7 @@ def activate_profile(profile_id):
 # ── Shared: fetch order with inventory data ──────────────────────────────────
 def fetch_order_data(order_identifier):
     if not credentials_ok():
-        return None, "No store profile active. Use the 🏪 button to add one.", 500
+        return None, "No store profile active. Use the Store button in the nav to add one.", 500
 
     headers = get_headers()
     shopify_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders.json"
@@ -329,13 +328,10 @@ def tag_order_as_packed(order_id):
         response.raise_for_status()
         order = response.json().get('order')
         existing_tags = order.get("tags", "")
-        today = datetime.now().strftime('%Y-%m-%d')
-        new_tag = f"Packed-{today}"
-        updated_tags = f"{existing_tags}, {new_tag}".strip(", ")
+        updated_tags = f"{existing_tags}, Packed".strip(", ")
         update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
-        log_accountant_entry('packed', 1)
-        return jsonify({"message": "Order tagged successfully", "tag": new_tag})
+        return jsonify({"message": "Order tagged successfully", "tag": "Packed"})
     except requests.exceptions.HTTPError as e:
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
     except Exception as e:
@@ -460,7 +456,6 @@ def tag_order_as_returned(order_id):
         updated_tags = f"{existing_tags}, Returned".strip(", ")
         update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
-        log_accountant_entry('returned', 1)
         return jsonify({"message": "Order tagged as Returned", "tag": "Returned"})
     except requests.exceptions.HTTPError as e:
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
@@ -618,7 +613,6 @@ def deduct_qty():
         })
         adj.raise_for_status()
         new_qty = adj.json().get('inventory_level', {}).get('available', 'unknown')
-        log_accountant_entry('po', qty)
         return jsonify({'success': True, 'sku': sku, 'deducted': qty, 'new_qty': new_qty})
     except requests.exceptions.HTTPError as e:
         return jsonify({'success': False, 'error': e.response.text}), e.response.status_code
@@ -629,19 +623,9 @@ def deduct_qty():
 # MY ACCOUNTANT
 # ════════════════════════════════════════════════════════════════════════════
 
+import json
+
 ACCOUNTANT_FILE = os.path.join(BASE_DIR, 'accountant_data.json')
-
-RATES = {
-    'packed_weekday': 13,
-    'packed_weekend': 15,
-    'returned':       15,
-    'po':              5,
-    'custom':        100,
-}
-
-def _is_weekend(date_obj):
-    # Mon=0 … Thu=3 → weekday | Fri=4, Sat=5, Sun=6 → weekend
-    return date_obj.weekday() >= 4
 
 def load_accountant_data():
     if os.path.exists(ACCOUNTANT_FILE):
@@ -655,43 +639,6 @@ def load_accountant_data():
 def save_accountant_data(data):
     with open(ACCOUNTANT_FILE, 'w') as f:
         json.dump(data, f, indent=2)
-
-def log_accountant_entry(entry_type, qty):
-    """Append one auto-generated entry to accountant_data.json."""
-    try:
-        now       = datetime.now()
-        date_str  = now.strftime('%Y-%m-%d')
-        display   = now.strftime('%d/%m/%Y')
-        day_name  = now.strftime('%A')
-        is_wkend  = _is_weekend(now)
-
-        if entry_type == 'packed':
-            rate = RATES['packed_weekend'] if is_wkend else RATES['packed_weekday']
-        elif entry_type == 'returned':
-            rate = RATES['returned']
-        elif entry_type == 'po':
-            rate = RATES['po']
-        elif entry_type == 'custom':
-            rate = RATES['custom']
-        else:
-            return
-
-        earnings = qty * rate
-        entry = {
-            'date':      date_str,
-            'display':   display,
-            'dayName':   day_name,
-            'isWeekend': is_wkend,
-            'type':      entry_type,
-            'qty':       qty,
-            'earnings':  earnings,
-            'auto':      True,   # flag so UI can distinguish auto vs manual
-        }
-        data = load_accountant_data()
-        data['entries'].append(entry)
-        save_accountant_data(data)
-    except Exception as e:
-        print(f"[ACCOUNTANT] Failed to log entry: {e}")
 
 @app.route('/accountant')
 def accountant():

@@ -17,9 +17,8 @@
                 <div class="qd-card">
                     <h3 class="qd-card-title">Upload CSV</h3>
                     <p class="qd-hint">Column 1: SKU &nbsp;|&nbsp; Column 2: Qty (blank = 1)</p>
-                    <!-- ✅ Fixed: changed from <label> to <div> to prevent double file dialog -->
                     <div class="file-drop" id="fileDrop">
-                        <span id="fileDropText">&#128194; Click or drag &amp; drop CSV here</span>
+                        <span id="fileDropText">Click or drag &amp; drop CSV here</span>
                         <input type="file" id="csvFile" accept=".csv" style="display:none">
                     </div>
                 </div>
@@ -58,10 +57,7 @@
                         <span id="listHint" class="list-hint">No items yet</span>
                     </div>
                     <div class="list-cols" id="listCols" style="display:none">
-                        <span>#</span>
-                        <span>SKU</span>
-                        <span>Qty</span>
-                        <span>Actions</span>
+                        <span>#</span><span>SKU</span><span>Qty</span><span>Actions</span>
                     </div>
                     <ul id="skuList" class="sku-list"></ul>
                 </div>
