@@ -9,29 +9,100 @@ const markPackedBtn = document.getElementById('markPackedBtn');
 const packedOrdersList = document.getElementById('packedOrdersList');
 const packedTotalSpan = document.getElementById('packedTotal');
 
-// Modal logic
 const imageModal = document.getElementById("imageModal");
 const modalImage = document.getElementById("modalImage");
 const modalClose = document.querySelector(".image-modal .close");
 
-modalClose.onclick = () => {
-    imageModal.style.display = "none";
-};
-
+modalClose.onclick = () => { imageModal.style.display = "none"; };
 window.onclick = function (event) {
-    if (event.target == imageModal) {
-        imageModal.style.display = "none";
-    }
+    if (event.target == imageModal) imageModal.style.display = "none";
 };
 
 let packedOrders = [];
 let currentOrder = null;
 let itemCounters = {};
 
+const SESSION_KEY = 'scanpack_state';
+
+function saveState() {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        packedOrders,
+        currentOrder,
+        itemCounters
+    }));
+}
+
+function loadState() {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    if (!raw) return;
+    try {
+        const state = JSON.parse(raw);
+        packedOrders = state.packedOrders || [];
+        currentOrder = state.currentOrder || null;
+        itemCounters = state.itemCounters || {};
+    } catch(e) {}
+}
+
+function restoreUI() {
+    updatePackedOrdersUI();
+
+    if (!currentOrder) return;
+
+    orderNameSpan.textContent = currentOrder.order_name;
+    shopifyOrderIdSpan.textContent = currentOrder.order_id;
+    fulfillmentStatusSpan.textContent = "N/A";
+    itemList.innerHTML = '';
+
+    currentOrder.line_items.forEach(item => {
+        const qty = item.quantity || 1;
+        const li = document.createElement('li');
+        li.dataset.variantId = item.variant_id;
+
+        const imageHtml = item.product_image
+            ? `<img src="${item.product_image}" alt="${item.title}" style="width: 70px; height: auto; margin-right: 10px; cursor: zoom-in; border-radius: 13px;" onclick="openImageModal('${item.product_image}')">`
+            : '';
+
+        li.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                ${imageHtml}
+                <div>
+                    <span>${item.title} (SKU: ${item.sku || 'N/A'})</span><br>
+                    <span>Size: ${item.size || 'N/A'}</span><br>
+                    ${item.customized_name ? `<span>Customized Name: ${item.customized_name}</span><br>` : ''}
+                    <div style="display: flex; align-items: center;">
+                        <span class="item-quantity">Packed: <span id="packed-${item.variant_id}">0</span> / ${qty}</span>
+                        <div class="counter-controls">
+                            <button onclick="decrementQuantity('${item.variant_id}')">-</button>
+                            <button onclick="incrementQuantity('${item.variant_id}')">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (item.quantity > item.available_quantity) {
+            li.style.backgroundColor = 'rgba(255, 0, 0, 0.39)';
+            li.title = `Warning: Not enough stock! Ordered ${item.quantity}, but only ${item.available_quantity ?? 0} available.`;
+        }
+
+        itemList.appendChild(li);
+
+        // Restore counter display
+        const packedSpan = document.getElementById(`packed-${item.variant_id}`);
+        if (packedSpan) {
+            packedSpan.textContent = itemCounters[item.variant_id] || 0;
+            if (itemCounters[item.variant_id] === item.quantity) {
+                li.classList.add('packed');
+            }
+        }
+    });
+
+    orderDetailsDiv.style.display = 'block';
+    checkPackingCompletion();
+}
+
 orderIdInput.addEventListener('keypress', function (event) {
-    if (event.key === 'Enter') {
-        fetchOrder();
-    }
+    if (event.key === 'Enter') fetchOrder();
 });
 
 function showMessage(message, type = 'info') {
@@ -62,16 +133,14 @@ async function fetchOrder() {
         const response = await fetch(`/api/get_order/${orderIdentifier}`);
         const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to fetch order');
-        }
+        if (!response.ok) throw new Error(data.error || 'Failed to fetch order');
 
         currentOrder = data;
 
-        // ✅ Only check the "Packed" tag
         const tags = (data.tags || '').toLowerCase().split(',').map(t => t.trim());
         if (tags.some(tag => tag.startsWith('packed'))) {
             showMessage(`Order ${data.order_name} is already tagged as Packed.`, "info");
+            saveState();
             return;
         }
 
@@ -81,7 +150,7 @@ async function fetchOrder() {
         shopifyOrderIdSpan.textContent = currentOrder.order_id;
         fulfillmentStatusSpan.textContent = "N/A";
 
-         currentOrder.line_items.forEach(item => {
+        currentOrder.line_items.forEach(item => {
             const qty = item.quantity || 1;
             itemCounters[item.variant_id] = 0;
 
@@ -100,7 +169,6 @@ async function fetchOrder() {
                         <span>Size: ${item.size || 'N/A'}</span><br>
                         ${item.customized_name ? `<span>Customized Name: ${item.customized_name}</span><br>` : ''}
                         <div style="display: flex; align-items: center;">
-
                             <span class="item-quantity">Packed: <span id="packed-${item.variant_id}">0</span> / ${qty}</span>
                             <div class="counter-controls">
                                 <button onclick="decrementQuantity('${item.variant_id}')">-</button>
@@ -111,14 +179,10 @@ async function fetchOrder() {
                 </div>
             `;
 
-            // MODIFICATION START
-            // Check if available_quantity is 0 or less
             if (item.quantity > item.available_quantity) {
-                li.style.backgroundColor = 'rgba(255, 0, 0, 0.39)'; 
+                li.style.backgroundColor = 'rgba(255, 0, 0, 0.39)';
                 li.title = `Warning: Not enough stock! Ordered ${item.quantity}, but only ${item.available_quantity ?? 0} available.`;
             }
-            // MODIFICATION END
-            
 
             itemList.appendChild(li);
         });
@@ -126,6 +190,7 @@ async function fetchOrder() {
         orderDetailsDiv.style.display = 'block';
         checkPackingCompletion();
         clearMessage();
+        saveState();
 
     } catch (error) {
         showMessage(`Error: ${error.message}`, "error");
@@ -144,11 +209,11 @@ function openImageModal(imageUrl) {
 function incrementQuantity(variantId) {
     const item = currentOrder.line_items.find(i => i.variant_id == variantId);
     if (!item) return;
-
     if (itemCounters[variantId] < item.quantity) {
         itemCounters[variantId]++;
         updateItemDisplay(variantId);
         checkPackingCompletion();
+        saveState();
     } else {
         showMessage(`Already packed maximum quantity for ${item.title}.`, "info");
     }
@@ -157,11 +222,11 @@ function incrementQuantity(variantId) {
 function decrementQuantity(variantId) {
     const item = currentOrder.line_items.find(i => i.variant_id == variantId);
     if (!item) return;
-
     if (itemCounters[variantId] > 0) {
         itemCounters[variantId]--;
         updateItemDisplay(variantId);
         checkPackingCompletion();
+        saveState();
     } else {
         showMessage(`Quantity for ${item.title} is already zero.`, "info");
     }
@@ -173,7 +238,6 @@ function updateItemDisplay(variantId) {
         packedCountSpan.textContent = itemCounters[variantId];
         const listItem = packedCountSpan.closest('li');
         const item = currentOrder.line_items.find(i => i.variant_id == variantId);
-
         if (itemCounters[variantId] === item.quantity) {
             listItem.classList.add('packed');
         } else {
@@ -189,7 +253,6 @@ function checkPackingCompletion() {
             allItemsPacked = false;
         }
     });
-
     markPackedBtn.disabled = !allItemsPacked;
     if (allItemsPacked) {
         showMessage("All items are packed! Ready to tag order as Packed.", "success");
@@ -233,6 +296,7 @@ async function markOrderAsPacked() {
 function addPackedOrder(orderName) {
     packedOrders.push(orderName);
     updatePackedOrdersUI();
+    saveState();
 }
 
 function updatePackedOrdersUI() {
@@ -248,6 +312,7 @@ function updatePackedOrdersUI() {
 function clearPackedOrders() {
     packedOrders = [];
     updatePackedOrdersUI();
+    saveState();
 }
 
 function clearOrder() {
@@ -262,8 +327,11 @@ function clearOrder() {
     markPackedBtn.disabled = true;
     clearMessage();
     orderIdInput.focus();
+    saveState();
 }
 
 window.onload = () => {
+    loadState();
+    restoreUI();
     orderIdInput.focus();
 };

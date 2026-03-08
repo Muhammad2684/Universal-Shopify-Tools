@@ -1,9 +1,10 @@
 import os
 import sys
+import json
 import threading
 import requests
-from flask import Flask, render_template, jsonify, request, abort
 from datetime import datetime
+from flask import Flask, render_template, jsonify, request, abort
 
 # ── PyInstaller path resolution ──────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
@@ -15,58 +16,185 @@ else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     app = Flask(__name__)
 
-# ── Load credentials ─────────────────────────────────────────────────────────
-def load_credentials():
-    config_path = os.path.join(BASE_DIR, 'config.txt')
-    if os.path.exists(config_path):
-        print(f"[CONFIG] Loading from: {config_path}")
-        with open(config_path, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if '=' in line and not line.startswith('#'):
-                    key, _, value = line.partition('=')
-                    os.environ[key.strip()] = value.strip()
-    else:
-        print(f"[CONFIG] config.txt not found at {config_path} — falling back to environment variables.")
+# ── Active credentials (driven entirely by profiles) ─────────────────────────
+active_creds = {
+    "SHOPIFY_STORE_URL":    "",
+    "SHOPIFY_ACCESS_TOKEN": "",
+    "SHOPIFY_API_VERSION":  "2024-07",
+    "METAFIELD_NAMESPACE":  "",
+    "METAFIELD_KEY":        "",
+}
 
-load_credentials()
+def SHOPIFY_STORE_URL():    return active_creds["SHOPIFY_STORE_URL"]
+def SHOPIFY_ACCESS_TOKEN(): return active_creds["SHOPIFY_ACCESS_TOKEN"]
+def SHOPIFY_API_VERSION():  return active_creds["SHOPIFY_API_VERSION"]
+def METAFIELD_NAMESPACE():  return active_creds["METAFIELD_NAMESPACE"]
+def METAFIELD_KEY():        return active_creds["METAFIELD_KEY"]
 
-SHOPIFY_STORE_URL = os.getenv('SHOPIFY_STORE_URL', '')
-SHOPIFY_ACCESS_TOKEN = os.getenv('SHOPIFY_ACCESS_TOKEN', '')
-SHOPIFY_API_VERSION = os.getenv('SHOPIFY_API_VERSION', '2024-07')
+def _apply_profile(p):
+    active_creds["SHOPIFY_STORE_URL"]    = p["store_url"]
+    active_creds["SHOPIFY_ACCESS_TOKEN"] = p["access_token"]
+    active_creds["SHOPIFY_API_VERSION"]  = p.get("api_version", "2024-07")
+    active_creds["METAFIELD_NAMESPACE"]  = p.get("metafield_namespace", "")
+    active_creds["METAFIELD_KEY"]        = p.get("metafield_key", "")
+
+def _clear_creds():
+    active_creds["SHOPIFY_STORE_URL"]    = ""
+    active_creds["SHOPIFY_ACCESS_TOKEN"] = ""
+    active_creds["SHOPIFY_API_VERSION"]  = "2024-07"
+    active_creds["METAFIELD_NAMESPACE"]  = ""
+    active_creds["METAFIELD_KEY"]        = ""
+
+# ── Auto-load the active profile on startup ───────────────────────────────────
+PROFILES_FILE = os.path.join(BASE_DIR, 'profiles.json')
+
+def boot_active_profile():
+    if not os.path.exists(PROFILES_FILE):
+        print("[STARTUP] No profiles.json found — waiting for user to add a profile.")
+        return
+    try:
+        with open(PROFILES_FILE, 'r') as f:
+            data = json.load(f)
+        active_id = data.get("active")
+        if not active_id:
+            print("[STARTUP] No active profile set.")
+            return
+        profile = next((p for p in data.get("profiles", []) if p["id"] == active_id), None)
+        if profile:
+            _apply_profile(profile)
+            print(f"[STARTUP] Loaded profile: {profile['name']} ({profile['store_url']})")
+        else:
+            print("[STARTUP] Active profile ID not found in profiles list.")
+    except Exception as e:
+        print(f"[STARTUP] Failed to load profile: {e}")
 
 print(f"[STARTUP] BASE_DIR: {BASE_DIR}")
-print(f"[STARTUP] Store URL: {SHOPIFY_STORE_URL}")
-print(f"[STARTUP] Token loaded: {'YES' if SHOPIFY_ACCESS_TOKEN else 'NO'}")
 
 # ── Stock App Config ─────────────────────────────────────────────────────────
-METAFIELD_NAMESPACE = os.getenv('METAFIELD_NAMESPACE', '')
-METAFIELD_KEY = os.getenv('METAFIELD_KEY', '')
-
 STOCK_CATEGORIES = {
-    "simple": {"tag": "HJMQS", "title": "Simple"},
+    "simple":   {"tag": "HJMQS",  "title": "Simple"},
     "2-button": {"tag": "HJMQ2B", "title": "2 Button"},
     "7-button": {"tag": "HJMQ7B", "title": "7 Button"},
-    "quilt": {"tag": "HJMQQ", "title": "Quilt"},
+    "quilt":    {"tag": "HJMQQ",  "title": "Quilt"},
+    "bednet":   {"tag": "HJMQBN", "title": "Bed Net"},
+    "7pcs":     {"tag": "HJMQ7P", "title": "7 Pcs"},
 }
 
 def get_headers():
     return {
-        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN,
+        "X-Shopify-Access-Token": SHOPIFY_ACCESS_TOKEN(),
         "Content-Type": "application/json"
     }
 
 def credentials_ok():
-    return bool(SHOPIFY_STORE_URL and SHOPIFY_ACCESS_TOKEN)
+    return bool(SHOPIFY_STORE_URL() and SHOPIFY_ACCESS_TOKEN())
+
+# ════════════════════════════════════════════════════════════════════════════
+# STORE PROFILES
+# ════════════════════════════════════════════════════════════════════════════
+
+def load_profiles():
+    if os.path.exists(PROFILES_FILE):
+        try:
+            with open(PROFILES_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"active": None, "profiles": []}
+
+def save_profiles(data):
+    with open(PROFILES_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+@app.route('/api/profiles', methods=['GET'])
+def get_profiles():
+    data = load_profiles()
+    safe = []
+    for p in data.get('profiles', []):
+        safe.append({
+            "id":                  p["id"],
+            "name":                p["name"],
+            "store_url":           p["store_url"],
+            "api_version":         p.get("api_version", "2024-07"),
+            "metafield_namespace": p.get("metafield_namespace", ""),
+            "metafield_key":       p.get("metafield_key", ""),
+            "token_set":           bool(p.get("access_token")),
+        })
+    return jsonify({"active": data.get("active"), "profiles": safe})
+
+@app.route('/api/profiles', methods=['POST'])
+def create_profile():
+    import uuid
+    body = request.get_json()
+    data = load_profiles()
+    new_profile = {
+        "id":                  str(uuid.uuid4()),
+        "name":                body.get("name", "New Store"),
+        "store_url":           body.get("store_url", "").strip().rstrip('/'),
+        "access_token":        body.get("access_token", "").strip(),
+        "api_version":         body.get("api_version", "2024-07").strip(),
+        "metafield_namespace": body.get("metafield_namespace", "").strip(),
+        "metafield_key":       body.get("metafield_key", "").strip(),
+    }
+    data["profiles"].append(new_profile)
+    # Auto-activate if it's the first profile
+    if not data.get("active"):
+        data["active"] = new_profile["id"]
+        _apply_profile(new_profile)
+    save_profiles(data)
+    return jsonify({"success": True, "id": new_profile["id"]})
+
+@app.route('/api/profiles/<profile_id>', methods=['PUT'])
+def update_profile(profile_id):
+    body = request.get_json()
+    data = load_profiles()
+    for p in data["profiles"]:
+        if p["id"] == profile_id:
+            p["name"]                = body.get("name", p["name"])
+            p["store_url"]           = body.get("store_url", p["store_url"]).strip().rstrip('/')
+            p["api_version"]         = body.get("api_version", p.get("api_version", "2024-07")).strip()
+            p["metafield_namespace"] = body.get("metafield_namespace", p.get("metafield_namespace", "")).strip()
+            p["metafield_key"]       = body.get("metafield_key", p.get("metafield_key", "")).strip()
+            if body.get("access_token", "").strip():
+                p["access_token"] = body.get("access_token").strip()
+            if data.get("active") == profile_id:
+                _apply_profile(p)
+            break
+    save_profiles(data)
+    return jsonify({"success": True})
+
+@app.route('/api/profiles/<profile_id>', methods=['DELETE'])
+def delete_profile(profile_id):
+    data = load_profiles()
+    data["profiles"] = [p for p in data["profiles"] if p["id"] != profile_id]
+    if data.get("active") == profile_id:
+        if data["profiles"]:
+            data["active"] = data["profiles"][0]["id"]
+            _apply_profile(data["profiles"][0])
+        else:
+            data["active"] = None
+            _clear_creds()
+    save_profiles(data)
+    return jsonify({"success": True})
+
+@app.route('/api/profiles/<profile_id>/activate', methods=['POST'])
+def activate_profile(profile_id):
+    data = load_profiles()
+    profile = next((p for p in data["profiles"] if p["id"] == profile_id), None)
+    if not profile:
+        return jsonify({"success": False, "error": "Profile not found"}), 404
+    data["active"] = profile_id
+    _apply_profile(profile)
+    save_profiles(data)
+    return jsonify({"success": True, "store_url": profile["store_url"], "name": profile["name"]})
 
 # ── Shared: fetch order with inventory data ──────────────────────────────────
 def fetch_order_data(order_identifier):
-    """Fetch order + inventory info. Returns (order_dict, error_str, status_code)."""
     if not credentials_ok():
-        return None, "Shopify credentials not configured. Please check config.txt.", 500
+        return None, "No store profile active. Use the 🏪 button to add one.", 500
 
     headers = get_headers()
-    shopify_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/orders.json"
+    shopify_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders.json"
     params = {"status": "any"}
     is_tracking_search = not (order_identifier.isdigit() or order_identifier.startswith("#"))
     if not is_tracking_search:
@@ -103,7 +231,7 @@ def fetch_order_data(order_identifier):
             if variant_id in variant_cache:
                 inventory_item_id = variant_cache[variant_id]
             else:
-                variant_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/variants/{variant_id}.json"
+                variant_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/variants/{variant_id}.json"
                 variant_resp = requests.get(variant_url, headers=headers)
                 if variant_resp.status_code == 200:
                     variant_data = variant_resp.json().get("variant", {})
@@ -111,7 +239,7 @@ def fetch_order_data(order_identifier):
                     variant_cache[variant_id] = inventory_item_id
 
         if inventory_item_id:
-            inventory_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/inventory_levels.json"
+            inventory_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/inventory_levels.json"
             inv_params = {"inventory_item_ids": [str(inventory_item_id)]}
             try:
                 inv_resp = requests.get(inventory_url, headers=headers, params=inv_params)
@@ -123,9 +251,8 @@ def fetch_order_data(order_identifier):
             except Exception:
                 pass
 
-        image_url = None
         if product_id and product_id not in image_cache:
-            product_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/products/{product_id}.json?fields=images"
+            product_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/products/{product_id}.json?fields=images"
             prod_resp = requests.get(product_url, headers=headers)
             if prod_resp.status_code == 200:
                 product_data = prod_resp.json().get("product")
@@ -133,28 +260,26 @@ def fetch_order_data(order_identifier):
                     image_url = next((img["src"] for img in product_data["images"] if variant_id in img.get("variant_ids", [])), None)
                     if not image_url:
                         image_url = product_data["images"][0].get("src")
-            image_cache[product_id] = image_url
-
-        final_image_url = image_cache.get(product_id)
+                    image_cache[product_id] = image_url
 
         line_items.append({
-            "product_id": product_id,
-            "variant_id": variant_id,
-            "title": item.get('title'),
-            "quantity": item.get('quantity'),
-            "sku": item.get('sku'),
-            "size": item.get('variant_title'),
-            "product_image": final_image_url,
-            "in_stock": in_stock,
+            "product_id":         product_id,
+            "variant_id":         variant_id,
+            "title":              item.get('title'),
+            "quantity":           item.get('quantity'),
+            "sku":                item.get('sku'),
+            "size":               item.get('variant_title'),
+            "product_image":      image_cache.get(product_id),
+            "in_stock":           in_stock,
             "available_quantity": available_quantity
         })
 
     return {
-        "order_id": order.get('id'),
-        "order_name": order.get('name'),
-        "line_items": line_items,
+        "order_id":           order.get('id'),
+        "order_name":         order.get('name'),
+        "line_items":         line_items,
         "fulfillment_status": order.get('fulfillment_status'),
-        "tags": order.get('tags', '')
+        "tags":               order.get('tags', '')
     }, None, 200
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -196,19 +321,20 @@ def get_order(order_identifier):
 @app.route('/api/fulfill_order/<order_id>', methods=['POST'])
 def tag_order_as_packed(order_id):
     if not credentials_ok():
-        return jsonify({"error": "Shopify credentials not configured."}), 500
+        return jsonify({"error": "No store profile active."}), 500
     headers = get_headers()
-    order_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/orders/{order_id}.json"
+    order_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders/{order_id}.json"
     try:
         response = requests.get(order_url, headers=headers, params={"fields": "tags"})
         response.raise_for_status()
         order = response.json().get('order')
         existing_tags = order.get("tags", "")
-        new_tag = "Packed"
+        today = datetime.now().strftime('%Y-%m-%d')
+        new_tag = f"Packed-{today}"
         updated_tags = f"{existing_tags}, {new_tag}".strip(", ")
-        update_payload = {"order": {"id": order_id, "tags": updated_tags}}
-        update_response = requests.put(order_url, headers=headers, json=update_payload)
+        update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
+        log_accountant_entry('packed', 1)
         return jsonify({"message": "Order tagged successfully", "tag": new_tag})
     except requests.exceptions.HTTPError as e:
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
@@ -234,24 +360,22 @@ def get_order_mark_paid(order_identifier):
 @app.route('/api/tag_order', methods=['POST'])
 def tag_order_as_paid():
     if not credentials_ok():
-        return jsonify({"error": "Shopify credentials not configured."}), 500
+        return jsonify({"error": "No store profile active."}), 500
     data = request.get_json()
     order_id = data.get('order_id')
     if not order_id:
         return jsonify({"error": "order_id is required"}), 400
     headers = get_headers()
-    order_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/orders/{order_id}.json"
+    order_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders/{order_id}.json"
     try:
         response = requests.get(order_url, headers=headers, params={"fields": "tags"})
         response.raise_for_status()
         order = response.json().get('order')
         existing_tags = order.get("tags", "")
-        new_tag = "Paid"
-        updated_tags = f"{existing_tags}, {new_tag}".strip(", ")
-        update_payload = {"order": {"id": order_id, "tags": updated_tags}}
-        update_response = requests.put(order_url, headers=headers, json=update_payload)
+        updated_tags = f"{existing_tags}, Paid".strip(", ")
+        update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
-        return jsonify({"message": "Order tagged as Paid", "tag": new_tag})
+        return jsonify({"message": "Order tagged as Paid", "tag": "Paid"})
     except requests.exceptions.HTTPError as e:
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
     except Exception as e:
@@ -260,41 +384,38 @@ def tag_order_as_paid():
 @app.route('/api/mark_paid_batch', methods=['POST'])
 def mark_paid_batch():
     if not credentials_ok():
-        return jsonify({"error": "Shopify credentials not configured."}), 500
+        return jsonify({"error": "No store profile active."}), 500
     data = request.get_json()
     order_ids = data.get('order_ids', [])
     if not order_ids:
         return jsonify({"error": "order_ids list is required"}), 400
-
     headers = get_headers()
     results = []
     for order_id in order_ids:
-        order_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/orders/{order_id}.json"
+        order_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders/{order_id}.json"
         try:
             resp = requests.get(order_url, headers=headers, params={"fields": "tags,name"})
             resp.raise_for_status()
             order = resp.json().get('order', {})
             existing_tags = order.get("tags", "")
             updated_tags = f"{existing_tags}, Paid".strip(", ")
-            update_payload = {"order": {"id": order_id, "tags": updated_tags}}
-            update_resp = requests.put(order_url, headers=headers, json=update_payload)
+            update_resp = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
             update_resp.raise_for_status()
             results.append({"order_id": order_id, "name": order.get("name"), "status": "success"})
         except Exception as e:
             results.append({"order_id": order_id, "status": "error", "details": str(e)})
-
     return jsonify({"results": results})
 
 @app.route('/check_csv_orders', methods=['POST'])
 def check_csv_orders():
     if not credentials_ok():
-        return jsonify({"error": "Shopify credentials not configured."}), 500
+        return jsonify({"error": "No store profile active."}), 500
     data = request.get_json()
     order_names = data.get('order_names', [])
     headers = get_headers()
     results = []
     for name in order_names:
-        shopify_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/orders.json"
+        shopify_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders.json"
         params = {"name": name, "status": "any"}
         try:
             resp = requests.get(shopify_url, headers=headers, params=params)
@@ -328,20 +449,19 @@ def get_order_returned(order_identifier):
 @app.route('/api/tag_returned/<order_id>', methods=['POST'])
 def tag_order_as_returned(order_id):
     if not credentials_ok():
-        return jsonify({"error": "Shopify credentials not configured."}), 500
+        return jsonify({"error": "No store profile active."}), 500
     headers = get_headers()
-    order_url = f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/orders/{order_id}.json"
+    order_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders/{order_id}.json"
     try:
         response = requests.get(order_url, headers=headers, params={"fields": "tags"})
         response.raise_for_status()
         order = response.json().get('order')
         existing_tags = order.get("tags", "")
-        new_tag = "Returned"
-        updated_tags = f"{existing_tags}, {new_tag}".strip(", ")
-        update_payload = {"order": {"id": order_id, "tags": updated_tags}}
-        update_response = requests.put(order_url, headers=headers, json=update_payload)
+        updated_tags = f"{existing_tags}, Returned".strip(", ")
+        update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
-        return jsonify({"message": "Order tagged as Returned", "tag": new_tag})
+        log_accountant_entry('returned', 1)
+        return jsonify({"message": "Order tagged as Returned", "tag": "Returned"})
     except requests.exceptions.HTTPError as e:
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
     except Exception as e:
@@ -352,7 +472,7 @@ def tag_order_as_returned(order_id):
 # ════════════════════════════════════════════════════════════════════════════
 
 def get_graphql_url():
-    return f"https://{SHOPIFY_STORE_URL}/admin/api/{SHOPIFY_API_VERSION}/graphql.json"
+    return f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/graphql.json"
 
 def run_graphql_query(query):
     try:
@@ -370,10 +490,10 @@ def process_product_edges(edges):
         current_qty = node['variants']['edges'][0]['node']['inventoryQuantity'] if node['variants']['edges'] else 0
         threshold = int(node['metafield']['value']) if node.get('metafield') else 0
         processed.append({
-            "title": node['title'],
-            "image_url": node['featuredImage']['url'] if node.get('featuredImage') else None,
+            "title":       node['title'],
+            "image_url":   node['featuredImage']['url'] if node.get('featuredImage') else None,
             "current_qty": current_qty,
-            "threshold": threshold,
+            "threshold":   threshold,
         })
     return processed
 
@@ -405,13 +525,14 @@ def show_urgent():
                 qty = node['variants']['edges'][0]['node']['inventoryQuantity']
                 if qty < 0:
                     products_to_display.append({
-                        "title": node['title'],
-                        "image_url": node['featuredImage']['url'] if node.get('featuredImage') else None,
+                        "title":       node['title'],
+                        "image_url":   node['featuredImage']['url'] if node.get('featuredImage') else None,
                         "current_qty": qty,
-                        "needed_qty": 0 - qty
+                        "needed_qty":  0 - qty
                     })
     sorted_products = sorted(products_to_display, key=lambda p: p['needed_qty'], reverse=True)
-    return render_template('urgent_page.html', products=sorted_products, page_title="Urgent", active_page='stock', active_stock='urgent')
+    return render_template('urgent_page.html', products=sorted_products, page_title="Urgent",
+                           active_page='stock', active_stock='urgent')
 
 @app.route('/stock/<category_slug>')
 def show_category(category_slug):
@@ -419,6 +540,8 @@ def show_category(category_slug):
         abort(404)
     category = STOCK_CATEGORIES[category_slug]
     tag = category["tag"]
+    ns  = METAFIELD_NAMESPACE()
+    key = METAFIELD_KEY()
     query = f"""
     {{
       products(first: 250, query: "tag:'{tag}'") {{
@@ -429,7 +552,7 @@ def show_category(category_slug):
             variants(first: 1) {{
               edges {{ node {{ inventoryQuantity }} }}
             }}
-            metafield(namespace: "{METAFIELD_NAMESPACE}", key: "{METAFIELD_KEY}") {{
+            metafield(namespace: "{ns}", key: "{key}") {{
               value
             }}
           }}
@@ -451,18 +574,156 @@ def show_category(category_slug):
     return render_template('category_page.html', products=sorted_products, page_title=category["title"],
                            active_page='stock', active_stock=category_slug)
 
+# ════════════════════════════════════════════════════════════════════════════
+# QTY DEDUCTION
+# ════════════════════════════════════════════════════════════════════════════
+
+@app.route('/deduct')
+def deduct():
+    return render_template('qty_deduct.html', active_page='deduct')
+
+@app.route('/api/deduct_qty', methods=['POST'])
+def deduct_qty():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+    data = request.get_json()
+    sku = (data.get('sku') or '').strip()
+    qty = int(data.get('qty') or 1)
+    if not sku:
+        return jsonify({'success': False, 'error': 'SKU is required'}), 400
+    if qty < 1:
+        return jsonify({'success': False, 'error': 'Qty must be at least 1'}), 400
+    headers = get_headers()
+    graphql_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/graphql.json"
+    safe_sku = sku.replace('"', '')
+    query = '{productVariants(first:5,query:"sku:' + safe_sku + '"){edges{node{id sku inventoryItem{id} inventoryQuantity}}}}'
+    try:
+        gql_resp = requests.post(graphql_url, headers=headers, json={'query': query})
+        gql_resp.raise_for_status()
+        edges = gql_resp.json().get('data', {}).get('productVariants', {}).get('edges', [])
+        match = next((e['node'] for e in edges if e['node'].get('sku') == sku), None)
+        if not match:
+            return jsonify({'success': False, 'error': 'SKU not found: ' + sku}), 404
+        inventory_item_id = match['inventoryItem']['id'].split('/')[-1]
+        loc_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/locations.json"
+        locations = requests.get(loc_url, headers=headers).json().get('locations', [])
+        if not locations:
+            return jsonify({'success': False, 'error': 'No locations found'}), 500
+        location_id = locations[0]['id']
+        adjust_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/inventory_levels/adjust.json"
+        adj = requests.post(adjust_url, headers=headers, json={
+            'location_id':          location_id,
+            'inventory_item_id':    inventory_item_id,
+            'available_adjustment': -qty
+        })
+        adj.raise_for_status()
+        new_qty = adj.json().get('inventory_level', {}).get('available', 'unknown')
+        log_accountant_entry('po', qty)
+        return jsonify({'success': True, 'sku': sku, 'deducted': qty, 'new_qty': new_qty})
+    except requests.exceptions.HTTPError as e:
+        return jsonify({'success': False, 'error': e.response.text}), e.response.status_code
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ════════════════════════════════════════════════════════════════════════════
+# MY ACCOUNTANT
+# ════════════════════════════════════════════════════════════════════════════
+
+ACCOUNTANT_FILE = os.path.join(BASE_DIR, 'accountant_data.json')
+
+RATES = {
+    'packed_weekday': 13,
+    'packed_weekend': 15,
+    'returned':       15,
+    'po':              5,
+    'custom':        100,
+}
+
+def _is_weekend(date_obj):
+    # Mon=0 … Thu=3 → weekday | Fri=4, Sat=5, Sun=6 → weekend
+    return date_obj.weekday() >= 4
+
+def load_accountant_data():
+    if os.path.exists(ACCOUNTANT_FILE):
+        try:
+            with open(ACCOUNTANT_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {'entries': []}
+
+def save_accountant_data(data):
+    with open(ACCOUNTANT_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def log_accountant_entry(entry_type, qty):
+    """Append one auto-generated entry to accountant_data.json."""
+    try:
+        now       = datetime.now()
+        date_str  = now.strftime('%Y-%m-%d')
+        display   = now.strftime('%d/%m/%Y')
+        day_name  = now.strftime('%A')
+        is_wkend  = _is_weekend(now)
+
+        if entry_type == 'packed':
+            rate = RATES['packed_weekend'] if is_wkend else RATES['packed_weekday']
+        elif entry_type == 'returned':
+            rate = RATES['returned']
+        elif entry_type == 'po':
+            rate = RATES['po']
+        elif entry_type == 'custom':
+            rate = RATES['custom']
+        else:
+            return
+
+        earnings = qty * rate
+        entry = {
+            'date':      date_str,
+            'display':   display,
+            'dayName':   day_name,
+            'isWeekend': is_wkend,
+            'type':      entry_type,
+            'qty':       qty,
+            'earnings':  earnings,
+            'auto':      True,   # flag so UI can distinguish auto vs manual
+        }
+        data = load_accountant_data()
+        data['entries'].append(entry)
+        save_accountant_data(data)
+    except Exception as e:
+        print(f"[ACCOUNTANT] Failed to log entry: {e}")
+
+@app.route('/accountant')
+def accountant():
+    return render_template('accountant.html', active_page='accountant')
+
+@app.route('/api/accountant/load', methods=['GET'])
+def accountant_load():
+    return jsonify(load_accountant_data())
+
+@app.route('/api/accountant/save', methods=['POST'])
+def accountant_save():
+    try:
+        data = request.get_json()
+        save_accountant_data({'entries': data.get('entries', [])})
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # ── Diagnostics ──────────────────────────────────────────────────────────────
 @app.route('/api/check_config')
 def check_config():
     return jsonify({
-        "store_url": SHOPIFY_STORE_URL,
-        "token_loaded": bool(SHOPIFY_ACCESS_TOKEN),
-        "token_last8": SHOPIFY_ACCESS_TOKEN[-8:] if SHOPIFY_ACCESS_TOKEN else "MISSING",
-        "api_version": SHOPIFY_API_VERSION,
-        "base_dir": BASE_DIR
+        "store_url":    SHOPIFY_STORE_URL(),
+        "token_loaded": bool(SHOPIFY_ACCESS_TOKEN()),
+        "token_last8":  SHOPIFY_ACCESS_TOKEN()[-8:] if SHOPIFY_ACCESS_TOKEN() else "MISSING",
+        "api_version":  SHOPIFY_API_VERSION(),
+        "base_dir":     BASE_DIR
     })
 
-# ── Startup ──────────────────────────────────────────────────────────────────
+# ── Boot ─────────────────────────────────────────────────────────────────────
+boot_active_profile()
+
 if __name__ == '__main__':
     import webview
 

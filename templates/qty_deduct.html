@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QTY Deduction</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style5.css') }}">
+</head>
+<body>
+    <header class="app-header">
+        <h1>QTY Deduction</h1>
+    </header>
+    <main class="app-main">
+        <div class="qd-layout">
+            <!-- LEFT PANEL -->
+            <div class="qd-left">
+                <div class="qd-card">
+                    <h3 class="qd-card-title">Upload CSV</h3>
+                    <p class="qd-hint">Column 1: SKU &nbsp;|&nbsp; Column 2: Qty (blank = 1)</p>
+                    <!-- ✅ Fixed: changed from <label> to <div> to prevent double file dialog -->
+                    <div class="file-drop" id="fileDrop">
+                        <span id="fileDropText">&#128194; Click or drag &amp; drop CSV here</span>
+                        <input type="file" id="csvFile" accept=".csv" style="display:none">
+                    </div>
+                </div>
+                <div class="qd-card">
+                    <h3 class="qd-card-title">Manual Entry</h3>
+                    <div class="manual-row">
+                        <input type="text" id="manualSku" placeholder="SKU" class="input-sku">
+                        <input type="number" id="manualQty" placeholder="Qty" min="1" value="1" class="input-qty">
+                        <button onclick="addManualEntry()" class="btn-add">+ Add</button>
+                    </div>
+                    <div id="manualStatus" class="inline-status"></div>
+                </div>
+                <div class="qd-card qd-summary">
+                    <div class="summary-stat">
+                        <span class="stat-num" id="totalSkus">0</span>
+                        <span class="stat-label">SKUs</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="stat-num" id="totalPieces">0</span>
+                        <span class="stat-label">Total Pieces</span>
+                    </div>
+                </div>
+                <div class="qd-actions">
+                    <button id="confirmBtn" onclick="confirmDeduction()" class="btn-confirm" disabled>
+                        &#10003; Confirm &amp; Deduct
+                    </button>
+                    <button onclick="clearAll()" class="btn-clear">&#10005; Clear All</button>
+                </div>
+                <div id="statusMessage" class="status-message" style="display:none;"></div>
+            </div>
+            <!-- RIGHT PANEL -->
+            <div class="qd-right">
+                <div class="qd-card qd-list-card">
+                    <div class="list-header">
+                        <h3 class="qd-card-title" style="margin:0">SKU Queue</h3>
+                        <span id="listHint" class="list-hint">No items yet</span>
+                    </div>
+                    <div class="list-cols" id="listCols" style="display:none">
+                        <span>#</span>
+                        <span>SKU</span>
+                        <span>Qty</span>
+                        <span>Actions</span>
+                    </div>
+                    <ul id="skuList" class="sku-list"></ul>
+                </div>
+                <div class="qd-card" id="progressSection" style="display:none">
+                    <h3 class="qd-card-title">Progress</h3>
+                    <div class="progress-bar-wrap">
+                        <div class="progress-bar-fill" id="progressFill" style="width:0%"></div>
+                    </div>
+                    <p id="progressText" class="progress-text">0 / 0</p>
+                    <div id="resultsLog" class="results-log"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer class="app-footer">
+        {% include 'navigation.html' %}
+    </footer>
+    <script src="{{ url_for('static', filename='js/main5.js') }}"></script>
+</body>
+</html>

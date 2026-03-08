@@ -36,7 +36,7 @@ function renderOrderToList(order, index) {
     li.innerHTML = `
         <div style="width: 40px; text-align: left;"><strong>${index}</strong></div>
         <div style="flex-grow: 1; text-align: left;">${order.order_name}</div>
-        <div style="min-width: 120px; text-align: right;">Rs. ${parseFloat(order.total_price).toFixed(2)}</div>
+        <div style="min-width: 120px; text-align: right;">Rs. ${parseFloat(order.total_price || 0).toFixed(2)}</div>
     `;
 
     orderList.appendChild(li);
@@ -65,7 +65,7 @@ async function processOrderId(id) {
             .includes("paid");
 
         if (hasPaidTag)
-            return showMessage(`${data.order_name} already has “Paid” tag.`, "error"), "tagged";
+            return showMessage(`${data.order_name} already has "Paid" tag.`, "error"), "tagged";
 
         if (data.payment_status === "paid")
             return showMessage(`${data.order_name} is already paid in Shopify.`, "error"), "paid";
@@ -90,7 +90,7 @@ async function processOrderId(id) {
     }
 }
 
-/* ---------- manual “Add Order” button ---------- */
+/* ---------- manual "Add Order" button ---------- */
 async function addOrder(orderNumber = null) {
     const id = orderNumber ? orderNumber.trim() : input.value.trim();
     if (!id) return showMessage("Please enter an order ID", "error");
@@ -206,7 +206,7 @@ function handleCsvUpload(file) {
         });
     };
     reader.readAsText(file);
-    document.getElementById('csvInput').value = '';  // allow re-upload of same file
+    document.getElementById('csvInput').value = '';
 }
 
 /* ---------- CSV Confirm Button ---------- */
@@ -224,7 +224,7 @@ document.getElementById('confirmCsvOrders').addEventListener('click', () => {
     modal.hide();
 });
 
-/* ---------- mark ALL queued orders with “Paid” tag and show status inside <li> ---------- */
+/* ---------- mark ALL queued orders with "Paid" tag and show status inside <li> ---------- */
 async function markAllAsPaid() {
     if (!queuedOrders.length)
         return showMessage("Queue is empty.", "error");
@@ -252,15 +252,16 @@ async function markAllAsPaid() {
 
             const data = await res.json();
 
-            if (data.success) {
+            // ✅ Fixed: check res.ok and data.message instead of data.success
+            if (res.ok && data.message) {
                 statusSpan.textContent = "✅ Tagged Paid";
                 statusSpan.style.color = "white";
-                li.style.backgroundColor = "#28a745";  // Bootstrap green
+                li.style.backgroundColor = "#28a745";
                 li.style.color = "white";
             } else {
-                statusSpan.textContent = `❌ ${data.message || "Failed"}`;
+                statusSpan.textContent = `❌ ${data.error || data.message || "Failed"}`;
                 statusSpan.style.color = "white";
-                li.style.backgroundColor = "#dc3545";  // Bootstrap red
+                li.style.backgroundColor = "#dc3545";
                 li.style.color = "white";
             }
 
@@ -273,7 +274,6 @@ async function markAllAsPaid() {
 
     showMessage("Finished tagging.", "success");
 
-    // Clear queue and UI
     queuedOrders = [];
     updateTotalAmount();
 }

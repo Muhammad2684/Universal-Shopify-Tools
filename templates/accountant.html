@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Accountant</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+ul { list-style: none; padding: 0; margin: 0; }
+
+/* ── Two-panel layout ── */
+.acc-layout { display: flex; gap: 40px; width: 100%; }
+
+/* ── LEFT PANEL ── */
+.acc-left {
+    width: 340px; flex-shrink: 0;
+    border-right: 1px solid var(--border-color);
+    padding-right: 30px;
+    display: flex; flex-direction: column; gap: 22px;
+}
+
+.acc-section-title {
+    color: var(--accent-color);
+    font-size: 0.82em; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin: 0 0 12px 0; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ── Entry type tabs ── */
+.type-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+.type-tab {
+    padding: 9px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 7px;
+    background-color: var(--item-bg);
+    color: var(--text-dark);
+    font-size: 0.82em; font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.18s;
+    line-height: 1.3;
+}
+.type-tab:hover { border-color: var(--accent-color); color: var(--text-light); transform: none; }
+.type-tab.active {
+    background-color: var(--accent-color);
+    border-color: var(--accent-color);
+    color: #fff;
+}
+.type-tab .tab-rate {
+    display: block;
+    font-size: 0.78em;
+    font-weight: 400;
+    opacity: 0.85;
+    margin-top: 2px;
+}
+
+/* ── Entry form ── */
+.entry-form { display: flex; flex-direction: column; gap: 10px; }
+.entry-form label { font-size: 0.88em; color: var(--text-dark); margin-bottom: 2px; display: block; }
+
+.entry-form input[type="number"],
+.entry-form input[type="date"],
+.entry-form select {
+    width: 100%; padding: 11px 12px;
+    border: 1px solid var(--input-border); border-radius: 6px;
+    font-size: 1em;
+    background-color: var(--input-bg); color: var(--text-light);
+    transition: border-color 0.2s; margin-bottom: 0;
+    -webkit-appearance: none; appearance: none;
+}
+.entry-form input:focus,
+.entry-form select:focus { border-color: var(--accent-color); outline: none; }
+
+/* weekend highlight on date */
+.date-weekend { border-color: #eab308 !important; }
+.day-badge {
+    font-size: 0.8em; font-weight: 600; padding: 3px 10px;
+    border-radius: 20px; display: inline-block; margin-top: -4px;
+    margin-bottom: 2px;
+}
+.day-badge.weekday  { background-color: rgba(34,197,94,0.15);  color: #22c55e; }
+.day-badge.weekend  { background-color: rgba(234,179,8,0.15);  color: #eab308; }
+
+/* Live preview */
+.entry-preview {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 10px 14px;
+    font-size: 0.9em; color: var(--text-dark);
+    display: flex; justify-content: space-between; align-items: center;
+}
+.entry-preview .preview-earn {
+    font-size: 1.1em; font-weight: 700; color: var(--accent-color);
+}
+
+.btn-row { display: flex; gap: 8px; }
+.btn-primary {
+    flex: 1; padding: 11px 16px;
+    background-color: #16a34a; color: #fff;
+    border: none; border-radius: 6px;
+    font-size: 1em; font-weight: 600; cursor: pointer;
+    transition: filter 0.2s, transform 0.15s;
+}
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-icon-sm {
+    padding: 11px 14px; border: none; border-radius: 6px;
+    color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: filter 0.2s, transform 0.15s;
+}
+.btn-icon-sm:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-icon-sm:active { transform: translateY(0); }
+.btn-icon-sm:disabled { opacity: 0.35; cursor: not-allowed; transform: none; filter: none; }
+.btn-undo { background-color: #b45309; }
+.btn-redo { background-color: #2563eb; }
+
+/* ── Summary Card ── */
+.summary-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 16px 18px;
+}
+.summary-total {
+    font-size: 2em; font-weight: 700;
+    color: var(--accent-color); line-height: 1;
+}
+.summary-label {
+    font-size: 0.78em; color: var(--text-dark);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-top: 3px; margin-bottom: 12px;
+}
+.summary-breakdown {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px; margin-top: 12px;
+}
+.breakdown-item {
+    background-color: var(--bg-primary);
+    border-radius: 6px; padding: 8px 10px;
+    font-size: 0.8em;
+}
+.breakdown-item .bi-label { color: var(--text-dark); margin-bottom: 2px; }
+.breakdown-item .bi-val   { color: var(--text-light); font-weight: 600; }
+
+/* ── Export / Danger ── */
+.action-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn-export {
+    flex: 1; padding: 9px 10px;
+    border: 1px solid var(--border-color); border-radius: 6px;
+    background-color: var(--item-bg); color: var(--text-light); font-size: 0.85em;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;
+    transition: border-color 0.2s, filter 0.2s, transform 0.15s;
+}
+.btn-export:hover { border-color: var(--accent-color); filter: brightness(1.1); transform: translateY(-1px); }
+.btn-export:active { transform: translateY(0); }
+.btn-danger {
+    width: 100%; padding: 9px;
+    background-color: transparent; border: 1px solid #dc3545; color: #dc3545;
+    border-radius: 6px; font-size: 0.85em; cursor: pointer;
+    transition: background-color 0.2s, transform 0.15s;
+}
+.btn-danger:hover { background-color: #dc3545; color: #fff; transform: translateY(-1px); }
+.btn-danger:active { transform: translateY(0); }
+
+/* ── RIGHT PANEL ── */
+.acc-right {
+    flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0;
+}
+
+/* Chart */
+.chart-wrap {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 18px 20px;
+}
+.chart-container { position: relative; height: 240px; }
+
+/* Filter bar */
+.filter-bar {
+    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.filter-bar label { font-size: 0.85em; color: var(--text-dark); }
+.filter-select {
+    padding: 7px 10px;
+    border: 1px solid var(--input-border); border-radius: 6px;
+    background-color: var(--input-bg); color: var(--text-light);
+    font-size: 0.85em; cursor: pointer;
+}
+.filter-select:focus { border-color: var(--accent-color); outline: none; }
+
+/* ── Entries Table ── */
+.entries-wrap {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px; overflow: hidden;
+}
+.entries-table-head {
+    display: grid;
+    grid-template-columns: 44px 100px 90px 110px 1fr 110px 100px;
+    padding: 10px 16px;
+    background-color: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.75em; font-weight: 700;
+    color: var(--text-dark); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.entries-list { max-height: 420px; overflow-y: auto; }
+.entries-list::-webkit-scrollbar { width: 6px; }
+.entries-list::-webkit-scrollbar-track { background: transparent; }
+.entries-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+.entry-row {
+    display: grid;
+    grid-template-columns: 44px 100px 90px 110px 1fr 110px 100px;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center; font-size: 0.9em;
+    transition: background-color 0.15s;
+}
+.entry-row:last-child { border-bottom: none; }
+.entry-row:hover { background-color: var(--item-bg); }
+
+.entry-num    { color: var(--text-dark); font-size: 0.82em; }
+.entry-date   { color: var(--text-dark); font-size: 0.88em; }
+.entry-day    { }
+.entry-type   { }
+.entry-detail { color: var(--text-light); }
+.entry-earn   { color: var(--accent-color); font-weight: 700; }
+.entry-actions { display: flex; gap: 5px; justify-content: flex-end; }
+
+/* Type badge */
+.type-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 0.78em; font-weight: 600;
+}
+.type-badge.packed   { background: rgba(34,197,94,0.15);   color: #22c55e; }
+.type-badge.returned { background: rgba(59,130,246,0.15);  color: #60a5fa; }
+.type-badge.po       { background: rgba(168,85,247,0.15);  color: #c084fc; }
+.type-badge.custom   { background: rgba(234,179,8,0.15);   color: #facc15; }
+
+/* Day badge small */
+.day-badge-sm {
+    display: inline-block; padding: 2px 7px; border-radius: 10px;
+    font-size: 0.75em; font-weight: 600;
+}
+.day-badge-sm.weekday { background: rgba(34,197,94,0.1);  color: #22c55e; }
+.day-badge-sm.weekend { background: rgba(234,179,8,0.1);  color: #eab308; }
+
+.btn-row-edit {
+    background: none; border: 1px solid var(--border-color);
+    border-radius: 4px; color: var(--text-dark);
+    cursor: pointer; padding: 3px 8px; font-size: 0.78em; transition: all 0.15s;
+}
+.btn-row-edit:hover { border-color: #2563eb; color: #2563eb; transform: none; }
+.btn-row-del {
+    background: none; border: 1px solid var(--border-color);
+    border-radius: 4px; color: var(--text-dark);
+    cursor: pointer; padding: 3px 8px; font-size: 0.78em; transition: all 0.15s;
+}
+.btn-row-del:hover { border-color: #dc3545; color: #dc3545; transform: none; }
+
+.entries-empty {
+    padding: 48px 20px; text-align: center;
+    color: var(--text-dark); font-style: italic;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    align-items: center; justify-content: center;
+    z-index: 200; padding: 1rem;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+    background-color: var(--bg-secondary); color: var(--text-light);
+    border: 1px solid var(--border-color); border-radius: 10px; padding: 24px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+    width: 380px; max-width: 95vw; animation: pop 0.15s ease;
+}
+@keyframes pop { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal-box h2 { font-size: 1.1em; font-weight: 700; margin-bottom: 10px; color: var(--accent-color); }
+.modal-box p  { font-size: 0.9em; margin-bottom: 18px; color: var(--text-dark); }
+.modal-btns   { display: flex; gap: 10px; justify-content: flex-end; }
+.modal-btns button {
+    padding: 8px 20px; border-radius: 6px; font-weight: 600;
+    font-size: 0.9em; cursor: pointer; border: none;
+    transition: filter 0.15s, transform 0.15s;
+}
+.modal-btns button:hover { transform: translateY(-1px); filter: brightness(1.1); }
+.btn-yes-delete   { background-color: #dc3545; color: #fff; }
+.btn-modal-cancel { background-color: var(--item-bg); color: var(--text-light); border: 1px solid var(--border-color) !important; }
+
+/* ── Toast ── */
+.toast {
+    display: none; position: fixed; bottom: 5rem; left: 50%;
+    transform: translateX(-50%);
+    padding: 10px 22px; background-color: #22c55e; color: #fff;
+    border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    font-size: 0.9em; font-weight: 500; z-index: 300; white-space: nowrap;
+}
+.toast.show { display: block; animation: toast-in 0.2s ease; }
+@keyframes toast-in { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+
+/* Saving dot */
+.saving-dot {
+    display: inline-block; width: 8px; height: 8px;
+    background-color: #22c55e; border-radius: 50%;
+    margin-left: 8px; opacity: 0; transition: opacity 0.2s; vertical-align: middle;
+}
+.saving-dot.show { opacity: 1; }
+
+/* Editing highlight */
+.editing-active { border-color: #eab308 !important; box-shadow: 0 0 0 2px rgba(234,179,8,0.2); }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <h1 style="text-align:center;">
+        My Accountant
+        <span class="saving-dot" id="savingDot" title="Saving…"></span>
+    </h1>
+</header>
+
+<main class="app-main">
+    <div class="container">
+        <div class="acc-layout">
+
+            <!-- ══ LEFT PANEL ══ -->
+            <div class="acc-left">
+
+                <!-- Entry Type Tabs -->
+                <div>
+                    <h3 class="acc-section-title">Entry Type</h3>
+                    <div class="type-tabs">
+                        <button class="type-tab active" id="tab-packed" onclick="selectType('packed')">
+                            Orders Packed
+                            <span class="tab-rate" id="rate-packed">Rs.13 / Rs.15</span>
+                        </button>
+                        <button class="type-tab" id="tab-returned" onclick="selectType('returned')">
+                            Returns Done
+                            <span class="tab-rate">Rs.15 flat</span>
+                        </button>
+                        <button class="type-tab" id="tab-po" onclick="selectType('po')">
+                            Purchase Order
+                            <span class="tab-rate">Rs.5 / unit</span>
+                        </button>
+                        <button class="type-tab" id="tab-custom" onclick="selectType('custom')">
+                            Custom Prints
+                            <span class="tab-rate">Rs.100 / order</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Entry Form -->
+                <div>
+                    <h3 class="acc-section-title">Add Entry</h3>
+                    <div class="entry-form">
+
+                        <!-- Date picker -->
+                        <div>
+                            <label for="entryDate">Date:</label>
+                            <input type="date" id="entryDate" onchange="onDateChange()">
+                            <div id="dayBadge" class="day-badge weekday" style="margin-top:6px;">Mon — Weekday</div>
+                        </div>
+
+                        <!-- Quantity label changes per type -->
+                        <div id="qtyBlock">
+                            <label for="entryQty" id="qtyLabel">Orders packed:</label>
+                            <input type="number" id="entryQty" placeholder="e.g. 85" min="1"
+                                   oninput="updatePreview()"
+                                   onkeydown="if(event.key==='Enter') submitEntry()">
+                        </div>
+
+                        <!-- Live earnings preview -->
+                        <div class="entry-preview">
+                            <span id="previewDesc" style="color:var(--text-dark);">Enter a value to preview</span>
+                            <span class="preview-earn" id="previewEarn">Rs. 0</span>
+                        </div>
+
+                        <div class="btn-row">
+                            <button class="btn-primary" id="addBtn" onclick="submitEntry()">Add Entry</button>
+                            <button class="btn-icon-sm btn-undo" id="undoBtn" onclick="undoAction()" title="Undo (Ctrl+Z)" disabled>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/></svg>
+                            </button>
+                            <button class="btn-icon-sm btn-redo" id="redoBtn" onclick="redoAction()" title="Redo (Ctrl+Y)" disabled>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3v5h-5"/><path d="M20.95 13A9 9 0 1 1 18 5.3L21 8"/></svg>
+                            </button>
+                        </div>
+                        <div id="entryStatus" class="status-message" style="display:none; margin-top:0;"></div>
+                    </div>
+                </div>
+
+                <!-- Summary -->
+                <div>
+                    <h3 class="acc-section-title">Summary</h3>
+                    <div class="summary-card">
+                        <div class="summary-total">Rs. <span id="totalDisplay">0</span></div>
+                        <div class="summary-label">Total Earnings</div>
+                        <div class="summary-breakdown">
+                            <div class="breakdown-item">
+                                <div class="bi-label">Packing</div>
+                                <div class="bi-val">Rs. <span id="brkPacked">0</span></div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="bi-label">Returns</div>
+                                <div class="bi-val">Rs. <span id="brkReturned">0</span></div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="bi-label">PO Units</div>
+                                <div class="bi-val">Rs. <span id="brkPo">0</span></div>
+                            </div>
+                            <div class="breakdown-item">
+                                <div class="bi-label">Custom</div>
+                                <div class="bi-val">Rs. <span id="brkCustom">0</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Export & Danger -->
+                <div>
+                    <h3 class="acc-section-title">Export</h3>
+                    <div class="action-row" style="margin-bottom:10px;">
+                        <button class="btn-export" onclick="exportJSON()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            JSON
+                        </button>
+                        <button class="btn-export" onclick="exportCSV()">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            CSV
+                        </button>
+                    </div>
+                    <button class="btn-danger" onclick="openDeleteModal()">Delete All Entries</button>
+                </div>
+
+            </div><!-- /acc-left -->
+
+            <!-- ══ RIGHT PANEL ══ -->
+            <div class="acc-right">
+
+                <!-- Chart -->
+                <div class="chart-wrap" id="chartWrap" style="display:none;">
+                    <h3 class="acc-section-title" style="margin-bottom:14px;">Earnings Over Time</h3>
+                    <div class="chart-container">
+                        <canvas id="mainChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Filter bar + Table -->
+                <div class="entries-wrap">
+                    <div style="padding:12px 16px; border-bottom:1px solid var(--border-color); background-color:var(--bg-primary);">
+                        <div class="filter-bar">
+                            <label>Filter:</label>
+                            <select class="filter-select" id="filterType" onchange="render()">
+                                <option value="all">All Types</option>
+                                <option value="packed">Packing</option>
+                                <option value="returned">Returns</option>
+                                <option value="po">Purchase Orders</option>
+                                <option value="custom">Custom Prints</option>
+                            </select>
+                            <select class="filter-select" id="filterDay" onchange="render()">
+                                <option value="all">All Days</option>
+                                <option value="weekday">Weekdays</option>
+                                <option value="weekend">Weekends</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="entries-table-head">
+                        <span>#</span>
+                        <span>Date</span>
+                        <span>Day</span>
+                        <span>Type</span>
+                        <span>Detail</span>
+                        <span>Earnings</span>
+                        <span style="text-align:right;">Actions</span>
+                    </div>
+                    <div class="entries-list" id="entriesList">
+                        <div class="entries-empty">No entries yet. Add your first entry on the left.</div>
+                    </div>
+                </div>
+
+            </div><!-- /acc-right -->
+        </div>
+    </div>
+</main>
+
+<footer class="app-footer">
+    {% include 'navigation.html' %}
+</footer>
+
+<!-- Delete All Modal -->
+<div class="modal-overlay" id="deleteModal" onclick="closeDeleteModal()">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <h2>Delete All Entries?</h2>
+        <p>This will remove all entries. You can undo this action immediately after.</p>
+        <div class="modal-btns">
+            <button class="btn-modal-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn-yes-delete"   onclick="confirmDeleteAll()">Delete All</button>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Pay Rates (constants) ─────────────────────────────────────────────────────
+const RATES = {
+    packed_weekday:  13,
+    packed_weekend:  15,
+    returned:        15,   // flat per return entry
+    po:               5,   // per unit in PO
+    custom:         100,   // per customized order printed
+};
+
+const TYPE_LABELS = {
+    packed:   'Packing',
+    returned: 'Returns',
+    po:       'PO',
+    custom:   'Custom',
+};
+
+const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const DAY_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let entries    = [];
+let undoStack  = [];
+let redoStack  = [];
+let editingIdx = null;
+let activeType = 'packed';
+let chart      = null;
+let toastTimer = null;
+let saveDotTimer = null;
+
+// ── Persistence ───────────────────────────────────────────────────────────────
+async function persist() {
+    document.getElementById('savingDot').classList.add('show');
+    clearTimeout(saveDotTimer);
+    try {
+        await fetch('/api/accountant/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entries })
+        });
+    } catch(e) { console.warn('Save failed:', e); }
+    saveDotTimer = setTimeout(() => document.getElementById('savingDot').classList.remove('show'), 800);
+}
+
+async function hydrate() {
+    try {
+        const res  = await fetch('/api/accountant/load');
+        const data = await res.json();
+        entries = data.entries || [];
+    } catch(e) { console.warn('Load failed, starting fresh.'); }
+    setTodayDate();
+    render();
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+function setTodayDate() {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    document.getElementById('entryDate').value = `${y}-${m}-${d}`;
+    onDateChange();
+}
+
+function getDateInfo(dateStr) {
+    // Parse as local date to avoid UTC offset issues
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    const dow  = date.getDay(); // 0=Sun, 6=Sat
+    const isWeekend = (dow === 0 || dow === 5 || dow === 6); // Fri=5, Sat=6, Sun=0
+    // Company week: Mon-Thu = weekday, Fri/Sat/Sun = weekend
+    const isCompanyWeekend = (dow === 5 || dow === 6 || dow === 0);
+    return {
+        dayName: DAY_FULL[dow],
+        dayShort: DAY_NAMES[dow],
+        isWeekend: isCompanyWeekend,
+        displayDate: date.toLocaleDateString('en-GB'),
+    };
+}
+
+function onDateChange() {
+    const dateStr = document.getElementById('entryDate').value;
+    if (!dateStr) return;
+    const info = getDateInfo(dateStr);
+    const badge = document.getElementById('dayBadge');
+    const dateInput = document.getElementById('entryDate');
+
+    badge.textContent = `${info.dayName} — ${info.isWeekend ? 'Weekend' : 'Weekday'}`;
+    badge.className   = `day-badge ${info.isWeekend ? 'weekend' : 'weekday'}`;
+    if (info.isWeekend) {
+        dateInput.classList.add('date-weekend');
+    } else {
+        dateInput.classList.remove('date-weekend');
+    }
+    updatePreview();
+}
+
+// ── Type selection ────────────────────────────────────────────────────────────
+const QTY_LABELS = {
+    packed:   'Orders packed:',
+    returned: 'Returns processed:',
+    po:       'Units in PO:',
+    custom:   'Custom orders printed:',
+};
+const QTY_PLACEHOLDERS = {
+    packed:   'e.g. 85',
+    returned: 'e.g. 12',
+    po:       'e.g. 200',
+    custom:   'e.g. 5',
+};
+
+function selectType(type) {
+    activeType = type;
+    ['packed','returned','po','custom'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === type);
+    });
+    document.getElementById('qtyLabel').textContent    = QTY_LABELS[type];
+    document.getElementById('entryQty').placeholder    = QTY_PLACEHOLDERS[type];
+    document.getElementById('entryQty').value          = '';
+
+    // Show/hide day badge — only matters for packing
+    document.getElementById('dayBadge').style.display = (type === 'packed') ? 'inline-block' : 'none';
+
+    updatePreview();
+    document.getElementById('entryQty').focus();
+}
+
+// ── Earnings calculation ──────────────────────────────────────────────────────
+function calcEarnings(type, qty, dateStr) {
+    const n = parseInt(qty, 10);
+    if (isNaN(n) || n < 1) return 0;
+    if (type === 'packed') {
+        const info = getDateInfo(dateStr);
+        return n * (info.isWeekend ? RATES.packed_weekend : RATES.packed_weekday);
+    }
+    if (type === 'returned') return n * RATES.returned;
+    if (type === 'po')       return n * RATES.po;
+    if (type === 'custom')   return n * RATES.custom;
+    return 0;
+}
+
+function updatePreview() {
+    const qty     = document.getElementById('entryQty').value;
+    const dateStr = document.getElementById('entryDate').value;
+    const n       = parseInt(qty, 10);
+    const earn    = (n > 0 && dateStr) ? calcEarnings(activeType, n, dateStr) : 0;
+
+    let desc = '';
+    if (n > 0 && dateStr) {
+        if (activeType === 'packed') {
+            const info = getDateInfo(dateStr);
+            const rate = info.isWeekend ? RATES.packed_weekend : RATES.packed_weekday;
+            desc = `${n} orders × Rs.${rate}`;
+        } else if (activeType === 'returned') {
+            desc = `${n} returns × Rs.${RATES.returned}`;
+        } else if (activeType === 'po') {
+            desc = `${n} units × Rs.${RATES.po}`;
+        } else if (activeType === 'custom') {
+            desc = `${n} prints × Rs.${RATES.custom}`;
+        }
+    } else {
+        desc = 'Enter a value to preview';
+    }
+    document.getElementById('previewDesc').textContent     = desc;
+    document.getElementById('previewEarn').textContent     = `Rs. ${earn.toLocaleString()}`;
+}
+
+// ── Entry CRUD ────────────────────────────────────────────────────────────────
+function submitEntry() {
+    const qtyVal  = document.getElementById('entryQty').value;
+    const dateStr = document.getElementById('entryDate').value;
+    const qty     = parseInt(qtyVal, 10);
+
+    if (!dateStr) { showStatus('Please select a date.', 'error'); return; }
+    if (isNaN(qty) || qty < 1) { showStatus('Please enter a valid quantity (≥ 1).', 'error'); return; }
+
+    const info  = getDateInfo(dateStr);
+    const earn  = calcEarnings(activeType, qty, dateStr);
+
+    const entry = {
+        date:     dateStr,
+        display:  info.displayDate,
+        dayName:  info.dayName,
+        isWeekend: info.isWeekend,
+        type:     activeType,
+        qty,
+        earnings: earn,
+    };
+
+    undoStack.push(JSON.parse(JSON.stringify(entries)));
+    redoStack = [];
+
+    if (editingIdx !== null) {
+        entries[editingIdx] = entry;
+        cancelEdit();
+    } else {
+        entries.push(entry);
+        document.getElementById('entryQty').value = '';
+    }
+
+    hideStatus();
+    persist();
+    render();
+    updatePreview();
+    document.getElementById('entryQty').focus();
+}
+
+function startEdit(i) {
+    const e = entries[i];
+    editingIdx = i;
+    selectType(e.type);
+    document.getElementById('entryDate').value = e.date;
+    document.getElementById('entryQty').value  = e.qty;
+    document.getElementById('entryQty').classList.add('editing-active');
+    document.getElementById('addBtn').textContent = 'Update Entry';
+    onDateChange();
+    showStatus(`Editing entry #${i + 1} — ${e.display}`, 'info');
+    document.getElementById('entryQty').focus();
+}
+
+function cancelEdit() {
+    editingIdx = null;
+    document.getElementById('addBtn').textContent = 'Add Entry';
+    document.getElementById('entryQty').value = '';
+    document.getElementById('entryQty').classList.remove('editing-active');
+    hideStatus();
+}
+
+function deleteEntry(i) {
+    undoStack.push(JSON.parse(JSON.stringify(entries)));
+    redoStack = [];
+    entries.splice(i, 1);
+    if (editingIdx === i) cancelEdit();
+    persist(); render();
+    showToast('Entry deleted');
+}
+
+// ── Undo / Redo ───────────────────────────────────────────────────────────────
+function undoAction() {
+    if (!undoStack.length) return;
+    redoStack.push(JSON.parse(JSON.stringify(entries)));
+    entries = undoStack.pop();
+    cancelEdit(); persist(); render();
+    showToast('Undo successful');
+}
+function redoAction() {
+    if (!redoStack.length) return;
+    undoStack.push(JSON.parse(JSON.stringify(entries)));
+    entries = redoStack.pop();
+    cancelEdit(); persist(); render();
+    showToast('Redo successful');
+}
+document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoAction(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redoAction(); }
+    if (e.key === 'Escape' && editingIdx !== null) cancelEdit();
+});
+
+// ── Delete All ────────────────────────────────────────────────────────────────
+function openDeleteModal()  { document.getElementById('deleteModal').classList.add('open'); }
+function closeDeleteModal() { document.getElementById('deleteModal').classList.remove('open'); }
+function confirmDeleteAll() {
+    undoStack.push(JSON.parse(JSON.stringify(entries)));
+    redoStack = [];
+    entries = [];
+    cancelEdit(); persist(); render();
+    closeDeleteModal();
+    showToast('All entries deleted');
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+function exportJSON() {
+    if (!entries.length) { showToast('No entries to export'); return; }
+    triggerDownload(new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' }), 'accountant_entries.json');
+    showToast('JSON downloaded');
+}
+function exportCSV() {
+    if (!entries.length) { showToast('No entries to export'); return; }
+    const rows = [['Date','Day','Type','Qty','Earnings']];
+    entries.forEach(e => rows.push([e.display, e.dayName, e.type, e.qty, e.earnings]));
+    const csv = rows.map(r => r.join(',')).join('\n');
+    triggerDownload(new Blob([csv], { type: 'text/csv' }), 'accountant_entries.csv');
+    showToast('CSV downloaded');
+}
+function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ── Status / Toast ────────────────────────────────────────────────────────────
+function showStatus(msg, type) {
+    const el = document.getElementById('entryStatus');
+    el.textContent = msg; el.className = `status-message ${type}`;
+    el.style.display = 'block';
+}
+function hideStatus() { document.getElementById('entryStatus').style.display = 'none'; }
+function showToast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+const TYPE_COLORS = {
+    packed:   '#22c55e',
+    returned: '#60a5fa',
+    po:       '#c084fc',
+    custom:   '#facc15',
+};
+
+function renderChart(filtered) {
+    if (chart) { chart.destroy(); chart = null; }
+    // Group by date, stack by type
+    const dateMap = {};
+    filtered.forEach(e => {
+        if (!dateMap[e.display]) dateMap[e.display] = { packed:0, returned:0, po:0, custom:0 };
+        dateMap[e.display][e.type] += e.earnings;
+    });
+    const labels = Object.keys(dateMap);
+    const lineDatasets = ['packed','returned','po','custom'].map(t => ({
+        label: TYPE_LABELS[t],
+        data: labels.map(l => dateMap[l][t] || 0),
+        borderColor: TYPE_COLORS[t],
+        backgroundColor: TYPE_COLORS[t] + '18',
+        borderWidth: 2.5,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: TYPE_COLORS[t],
+        pointRadius: 4,
+        pointHoverRadius: 6,
+    }));
+
+    chart = new Chart(document.getElementById('mainChart'), {
+        type: 'line',
+        data: { labels, datasets: lineDatasets },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: { color: '#b0b0b0', font: { size: 11 }, boxWidth: 12, padding: 16 }
+                },
+                tooltip: {
+                    backgroundColor: '#0f0f1d', titleColor: '#e0e0e0',
+                    bodyColor: '#b0b0b0', borderColor: '#33334d',
+                    borderWidth: 1, borderRadius: 8, padding: 10,
+                    callbacks: { label: ctx => `${ctx.dataset.label}: Rs. ${ctx.raw.toLocaleString()}` }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#b0b0b0', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { ticks: { color: '#b0b0b0', font: { size: 10 }, callback: v => 'Rs.' + v }, grid: { color: 'rgba(255,255,255,0.04)' } }
+            }
+        }
+    });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+function render() {
+    // Totals & breakdown
+    let total = 0, bPacked = 0, bReturned = 0, bPo = 0, bCustom = 0;
+    entries.forEach(e => {
+        total += e.earnings;
+        if (e.type === 'packed')   bPacked   += e.earnings;
+        if (e.type === 'returned') bReturned += e.earnings;
+        if (e.type === 'po')       bPo       += e.earnings;
+        if (e.type === 'custom')   bCustom   += e.earnings;
+    });
+    document.getElementById('totalDisplay').textContent = total.toLocaleString();
+    document.getElementById('brkPacked').textContent    = bPacked.toLocaleString();
+    document.getElementById('brkReturned').textContent  = bReturned.toLocaleString();
+    document.getElementById('brkPo').textContent        = bPo.toLocaleString();
+    document.getElementById('brkCustom').textContent    = bCustom.toLocaleString();
+
+    document.getElementById('undoBtn').disabled = undoStack.length === 0;
+    document.getElementById('redoBtn').disabled = redoStack.length === 0;
+
+    // Apply filters
+    const typeFilter = document.getElementById('filterType').value;
+    const dayFilter  = document.getElementById('filterDay').value;
+    let filtered = entries.filter(e => {
+        if (typeFilter !== 'all' && e.type !== typeFilter) return false;
+        if (dayFilter === 'weekday' && e.isWeekend)  return false;
+        if (dayFilter === 'weekend' && !e.isWeekend) return false;
+        return true;
+    });
+
+    // Chart
+    const hasEntries = entries.length > 0;
+    document.getElementById('chartWrap').style.display = hasEntries ? 'block' : 'none';
+    if (hasEntries) renderChart(filtered);
+
+    // Table
+    const list = document.getElementById('entriesList');
+    list.innerHTML = '';
+    if (!filtered.length) {
+        const empty = document.createElement('div');
+        empty.className = 'entries-empty';
+        empty.textContent = entries.length ? 'No entries match the current filter.' : 'No entries yet. Add your first entry on the left.';
+        list.appendChild(empty);
+        return;
+    }
+
+    // Newest first — use original index for edit/delete
+    const indexed = filtered.map((e, _) => ({ e, i: entries.indexOf(e) }));
+    indexed.reverse().forEach(({ e, i }) => {
+        const row = document.createElement('div');
+        row.className = 'entry-row';
+        const dayClass = e.isWeekend ? 'weekend' : 'weekday';
+        const dayText  = e.isWeekend ? 'Weekend' : 'Weekday';
+        row.innerHTML = `
+            <span class="entry-num">${i + 1}</span>
+            <span class="entry-date">${e.display}</span>
+            <span class="entry-day"><span class="day-badge-sm ${dayClass}">${dayText}</span></span>
+            <span class="entry-type"><span class="type-badge ${e.type}">${TYPE_LABELS[e.type]}</span></span>
+            <span class="entry-detail">${e.qty} ${e.type === 'po' ? 'units' : e.type === 'custom' ? 'prints' : e.type === 'returned' ? 'returns' : 'orders'}</span>
+            <span class="entry-earn">Rs. ${e.earnings.toLocaleString()}</span>
+            <div class="entry-actions">
+                <button class="btn-row-edit" onclick="startEdit(${i})">Edit</button>
+                <button class="btn-row-del"  onclick="deleteEntry(${i})">Del</button>
+            </div>`;
+        list.appendChild(row);
+    });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+hydrate();
+selectType('packed');
+</script>
+</body>
+</html>
