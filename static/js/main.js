@@ -330,6 +330,54 @@ function clearOrder() {
     saveState();
 }
 
+async function addEntryToAccountant() {
+    const total = packedOrders.length;
+    if (total === 0) {
+        showMessage('No packed orders to add as entry.', 'error');
+        return;
+    }
+
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0]; // YYYY-MM-DD
+    const dow = today.getDay(); // 0=Sun, 6=Sat
+    const isWeekend = dow === 0 || dow === 6;
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const dayFull  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const rate = isWeekend ? 15 : 13;
+    const earnings = total * rate;
+
+    const day = today.getDate();
+    const month = today.toLocaleString('default', { month: 'long' });
+    const year = today.getFullYear();
+    const suffix = day === 1||day===21||day===31 ? 'st' : day===2||day===22 ? 'nd' : day===3||day===23 ? 'rd' : 'th';
+    const displayDate = `${dayFull[dow]}, ${day}${suffix} ${month} ${year}`;
+
+    const newEntry = {
+        date: dateStr,
+        display: displayDate,
+        dayName: dayNames[dow],
+        isWeekend,
+        type: 'packed',
+        qty: total,
+        earnings,
+    };
+
+    try {
+        const res = await fetch('/api/accountant/load');
+        const data = await res.json();
+        const entries = data.entries || [];
+        entries.push(newEntry);
+        await fetch('/api/accountant/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ entries })
+        });
+        showMessage(`Entry added to My Accountant`, 'success');
+    } catch (e) {
+        showMessage('Failed to add entry to My Accountant.', 'error');
+    }
+}
+
 window.onload = () => {
     loadState();
     restoreUI();

@@ -3,6 +3,8 @@ import sys
 import json
 import threading
 import requests
+import datetime
+import csv
 from flask import Flask, render_template, jsonify, request, abort
 
 # ── PyInstaller path resolution ──────────────────────────────────────────────
@@ -136,7 +138,6 @@ def create_profile():
         "metafield_key":       body.get("metafield_key", "").strip(),
     }
     data["profiles"].append(new_profile)
-    # Auto-activate if it's the first profile
     if not data.get("active"):
         data["active"] = new_profile["id"]
         _apply_profile(new_profile)
@@ -328,10 +329,12 @@ def tag_order_as_packed(order_id):
         response.raise_for_status()
         order = response.json().get('order')
         existing_tags = order.get("tags", "")
-        updated_tags = f"{existing_tags}, Packed".strip(", ")
+        today = datetime.date.today().strftime("%d-%m-%Y")
+        packed_tag = f"Packed {today}"
+        updated_tags = f"{existing_tags}, {packed_tag}".strip(", ")
         update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
-        return jsonify({"message": "Order tagged successfully", "tag": "Packed"})
+        return jsonify({"message": "Order tagged successfully", "tag": packed_tag})
     except requests.exceptions.HTTPError as e:
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
     except Exception as e:
@@ -623,8 +626,6 @@ def deduct_qty():
 # MY ACCOUNTANT
 # ════════════════════════════════════════════════════════════════════════════
 
-import json
-
 ACCOUNTANT_FILE = os.path.join(BASE_DIR, 'accountant_data.json')
 
 def load_accountant_data():
@@ -654,6 +655,37 @@ def accountant_save():
         data = request.get_json()
         save_accountant_data({'entries': data.get('entries', [])})
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/accountant/export', methods=['POST'])
+def accountant_export():
+    try:
+        data     = request.get_json()
+        fmt      = data.get('format', 'csv')
+        entries  = data.get('entries', [])
+
+        timestamp = datetime.datetime.now().strftime('%Y-%m-%d_%H-%M')
+        filename  = f'accountant_{timestamp}.{fmt}'
+        filepath  = os.path.join(BASE_DIR, filename)
+
+        if fmt == 'json':
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(entries, f, indent=2)
+        else:
+            with open(filepath, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow(['Date', 'Day', 'Type', 'Qty', 'Earnings'])
+                for e in entries:
+                    writer.writerow([
+                        e.get('display', ''),
+                        e.get('dayName', ''),
+                        e.get('type', ''),
+                        e.get('qty', ''),
+                        e.get('earnings', '')
+                    ])
+
+        return jsonify({'success': True, 'path': filepath, 'filename': filename})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -687,6 +719,7 @@ if __name__ == '__main__':
         "Shopify Tools",
         "http://127.0.0.1:5000",
         width=1200,
-        height=800
+        height=800,
+        maximized=True
     )
     webview.start()

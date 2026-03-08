@@ -79,7 +79,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 .entry-form input:focus,
 .entry-form select:focus { border-color: var(--accent-color); outline: none; }
 
-/* weekend highlight on date */
 .date-weekend { border-color: #eab308 !important; }
 .day-badge {
     font-size: 0.8em; font-weight: 600; padding: 3px 10px;
@@ -89,7 +88,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 .day-badge.weekday  { background-color: rgba(34,197,94,0.15);  color: #22c55e; }
 .day-badge.weekend  { background-color: rgba(234,179,8,0.15);  color: #eab308; }
 
-/* Live preview */
 .entry-preview {
     background-color: var(--bg-secondary);
     border: 1px solid var(--border-color);
@@ -162,6 +160,28 @@ ul { list-style: none; padding: 0; margin: 0; }
 }
 .btn-export:hover { border-color: var(--accent-color); filter: brightness(1.1); transform: translateY(-1px); }
 .btn-export:active { transform: translateY(0); }
+
+/* Export result box */
+.export-result {
+    display: none;
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(34,197,94,0.08);
+    border: 1px solid rgba(34,197,94,0.25);
+    border-radius: 6px;
+    font-size: 0.8em;
+    word-break: break-all;
+    line-height: 1.5;
+}
+.export-result .export-label {
+    color: #22c55e; font-weight: 600; display: block; margin-bottom: 3px;
+}
+.export-result .export-path {
+    color: var(--text-dark);
+    font-family: monospace;
+    font-size: 0.95em;
+}
+
 .btn-danger {
     width: 100%; padding: 9px;
     background-color: transparent; border: 1px solid #dc3545; color: #dc3545;
@@ -230,13 +250,9 @@ ul { list-style: none; padding: 0; margin: 0; }
 
 .entry-num    { color: var(--text-dark); font-size: 0.82em; }
 .entry-date   { color: var(--text-dark); font-size: 0.88em; }
-.entry-day    { }
-.entry-type   { }
-.entry-detail { color: var(--text-light); }
 .entry-earn   { color: var(--accent-color); font-weight: 700; }
 .entry-actions { display: flex; gap: 5px; justify-content: flex-end; }
 
-/* Type badge */
 .type-badge {
     display: inline-block; padding: 2px 8px; border-radius: 12px;
     font-size: 0.78em; font-weight: 600;
@@ -246,7 +262,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 .type-badge.po       { background: rgba(168,85,247,0.15);  color: #c084fc; }
 .type-badge.custom   { background: rgba(234,179,8,0.15);   color: #facc15; }
 
-/* Day badge small */
 .day-badge-sm {
     display: inline-block; padding: 2px 7px; border-radius: 10px;
     font-size: 0.75em; font-weight: 600;
@@ -310,7 +325,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 .toast.show { display: block; animation: toast-in 0.2s ease; }
 @keyframes toast-in { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 
-/* Saving dot */
 .saving-dot {
     display: inline-block; width: 8px; height: 8px;
     background-color: #22c55e; border-radius: 50%;
@@ -318,7 +332,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 }
 .saving-dot.show { opacity: 1; }
 
-/* Editing highlight */
 .editing-active { border-color: #eab308 !important; box-shadow: 0 0 0 2px rgba(234,179,8,0.2); }
 </style>
 </head>
@@ -366,14 +379,12 @@ ul { list-style: none; padding: 0; margin: 0; }
                     <h3 class="acc-section-title">Add Entry</h3>
                     <div class="entry-form">
 
-                        <!-- Date picker -->
                         <div>
                             <label for="entryDate">Date:</label>
                             <input type="date" id="entryDate" onchange="onDateChange()">
                             <div id="dayBadge" class="day-badge weekday" style="margin-top:6px;">Mon — Weekday</div>
                         </div>
 
-                        <!-- Quantity label changes per type -->
                         <div id="qtyBlock">
                             <label for="entryQty" id="qtyLabel">Orders packed:</label>
                             <input type="number" id="entryQty" placeholder="e.g. 85" min="1"
@@ -381,7 +392,6 @@ ul { list-style: none; padding: 0; margin: 0; }
                                    onkeydown="if(event.key==='Enter') submitEntry()">
                         </div>
 
-                        <!-- Live earnings preview -->
                         <div class="entry-preview">
                             <span id="previewDesc" style="color:var(--text-dark);">Enter a value to preview</span>
                             <span class="preview-earn" id="previewEarn">Rs. 0</span>
@@ -440,7 +450,14 @@ ul { list-style: none; padding: 0; margin: 0; }
                             CSV
                         </button>
                     </div>
-                    <button class="btn-danger" onclick="openDeleteModal()">Delete All Entries</button>
+
+                    <!-- File saved confirmation + path -->
+                    <div class="export-result" id="exportResult">
+                        <span class="export-label">✓ File saved:</span>
+                        <span class="export-path" id="exportPath"></span>
+                    </div>
+
+                    <button class="btn-danger" onclick="openDeleteModal()" style="margin-top:10px;">Delete All Entries</button>
                 </div>
 
             </div><!-- /acc-left -->
@@ -517,9 +534,9 @@ ul { list-style: none; padding: 0; margin: 0; }
 const RATES = {
     packed_weekday:  13,
     packed_weekend:  15,
-    returned:        15,   // flat per return entry
-    po:               5,   // per unit in PO
-    custom:         100,   // per customized order printed
+    returned:        15,
+    po:               5,
+    custom:         100,
 };
 
 const TYPE_LABELS = {
@@ -577,17 +594,14 @@ function setTodayDate() {
 }
 
 function getDateInfo(dateStr) {
-    // Parse as local date to avoid UTC offset issues
     const [y, m, d] = dateStr.split('-').map(Number);
     const date = new Date(y, m - 1, d);
-    const dow  = date.getDay(); // 0=Sun, 6=Sat
-    const isWeekend = (dow === 0 || dow === 5 || dow === 6); // Fri=5, Sat=6, Sun=0
-    // Company week: Mon-Thu = weekday, Fri/Sat/Sun = weekend
+    const dow  = date.getDay();
     const isCompanyWeekend = (dow === 5 || dow === 6 || dow === 0);
     return {
-        dayName: DAY_FULL[dow],
-        dayShort: DAY_NAMES[dow],
-        isWeekend: isCompanyWeekend,
+        dayName:     DAY_FULL[dow],
+        dayShort:    DAY_NAMES[dow],
+        isWeekend:   isCompanyWeekend,
         displayDate: date.toLocaleDateString('en-GB'),
     };
 }
@@ -598,7 +612,6 @@ function onDateChange() {
     const info = getDateInfo(dateStr);
     const badge = document.getElementById('dayBadge');
     const dateInput = document.getElementById('entryDate');
-
     badge.textContent = `${info.dayName} — ${info.isWeekend ? 'Weekend' : 'Weekday'}`;
     badge.className   = `day-badge ${info.isWeekend ? 'weekend' : 'weekday'}`;
     if (info.isWeekend) {
@@ -631,10 +644,7 @@ function selectType(type) {
     document.getElementById('qtyLabel').textContent    = QTY_LABELS[type];
     document.getElementById('entryQty').placeholder    = QTY_PLACEHOLDERS[type];
     document.getElementById('entryQty').value          = '';
-
-    // Show/hide day badge — only matters for packing
-    document.getElementById('dayBadge').style.display = (type === 'packed') ? 'inline-block' : 'none';
-
+    document.getElementById('dayBadge').style.display  = (type === 'packed') ? 'inline-block' : 'none';
     updatePreview();
     document.getElementById('entryQty').focus();
 }
@@ -658,7 +668,6 @@ function updatePreview() {
     const dateStr = document.getElementById('entryDate').value;
     const n       = parseInt(qty, 10);
     const earn    = (n > 0 && dateStr) ? calcEarnings(activeType, n, dateStr) : 0;
-
     let desc = '';
     if (n > 0 && dateStr) {
         if (activeType === 'packed') {
@@ -675,8 +684,8 @@ function updatePreview() {
     } else {
         desc = 'Enter a value to preview';
     }
-    document.getElementById('previewDesc').textContent     = desc;
-    document.getElementById('previewEarn').textContent     = `Rs. ${earn.toLocaleString()}`;
+    document.getElementById('previewDesc').textContent = desc;
+    document.getElementById('previewEarn').textContent = `Rs. ${earn.toLocaleString()}`;
 }
 
 // ── Entry CRUD ────────────────────────────────────────────────────────────────
@@ -684,26 +693,21 @@ function submitEntry() {
     const qtyVal  = document.getElementById('entryQty').value;
     const dateStr = document.getElementById('entryDate').value;
     const qty     = parseInt(qtyVal, 10);
-
     if (!dateStr) { showStatus('Please select a date.', 'error'); return; }
     if (isNaN(qty) || qty < 1) { showStatus('Please enter a valid quantity (≥ 1).', 'error'); return; }
-
     const info  = getDateInfo(dateStr);
     const earn  = calcEarnings(activeType, qty, dateStr);
-
     const entry = {
-        date:     dateStr,
-        display:  info.displayDate,
-        dayName:  info.dayName,
+        date:      dateStr,
+        display:   info.displayDate,
+        dayName:   info.dayName,
         isWeekend: info.isWeekend,
-        type:     activeType,
+        type:      activeType,
         qty,
-        earnings: earn,
+        earnings:  earn,
     };
-
     undoStack.push(JSON.parse(JSON.stringify(entries)));
     redoStack = [];
-
     if (editingIdx !== null) {
         entries[editingIdx] = entry;
         cancelEdit();
@@ -711,7 +715,6 @@ function submitEntry() {
         entries.push(entry);
         document.getElementById('entryQty').value = '';
     }
-
     hideStatus();
     persist();
     render();
@@ -783,25 +786,46 @@ function confirmDeleteAll() {
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
-function exportJSON() {
+async function exportCSV() {
     if (!entries.length) { showToast('No entries to export'); return; }
-    triggerDownload(new Blob([JSON.stringify(entries, null, 2)], { type: 'application/json' }), 'accountant_entries.json');
-    showToast('JSON downloaded');
+    try {
+        const res  = await fetch('/api/accountant/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ format: 'csv', entries })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('exportPath').textContent = data.path;
+            document.getElementById('exportResult').style.display = 'block';
+            showToast('CSV saved ✓');
+        } else {
+            showToast('Export failed: ' + (data.error || 'unknown error'));
+        }
+    } catch(e) {
+        showToast('Export failed');
+    }
 }
-function exportCSV() {
+
+async function exportJSON() {
     if (!entries.length) { showToast('No entries to export'); return; }
-    const rows = [['Date','Day','Type','Qty','Earnings']];
-    entries.forEach(e => rows.push([e.display, e.dayName, e.type, e.qty, e.earnings]));
-    const csv = rows.map(r => r.join(',')).join('\n');
-    triggerDownload(new Blob([csv], { type: 'text/csv' }), 'accountant_entries.csv');
-    showToast('CSV downloaded');
-}
-function triggerDownload(blob, filename) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click();
-    document.body.removeChild(a); URL.revokeObjectURL(url);
+    try {
+        const res  = await fetch('/api/accountant/export', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ format: 'json', entries })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('exportPath').textContent = data.path;
+            document.getElementById('exportResult').style.display = 'block';
+            showToast('JSON saved ✓');
+        } else {
+            showToast('Export failed: ' + (data.error || 'unknown error'));
+        }
+    } catch(e) {
+        showToast('Export failed');
+    }
 }
 
 // ── Status / Toast ────────────────────────────────────────────────────────────
@@ -828,24 +852,27 @@ const TYPE_COLORS = {
 
 function renderChart(filtered) {
     if (chart) { chart.destroy(); chart = null; }
-    // Group by date, stack by type
     const dateMap = {};
     filtered.forEach(e => {
-        if (!dateMap[e.display]) dateMap[e.display] = { packed:0, returned:0, po:0, custom:0 };
-        dateMap[e.display][e.type] += e.earnings;
+        if (!dateMap[e.date]) dateMap[e.date] = { display: e.display, packed:0, returned:0, po:0, custom:0 };
+        dateMap[e.date][e.type] += e.earnings;
     });
-    const labels = Object.keys(dateMap);
+    const sortedDates = Object.keys(dateMap).sort();
+    const labels = sortedDates.map(d => dateMap[d].display);
     const datasets = ['packed','returned','po','custom'].map(t => ({
         label: TYPE_LABELS[t],
-        data: labels.map(l => dateMap[l][t] || 0),
-        backgroundColor: TYPE_COLORS[t] + '99',
+        data: sortedDates.map(d => dateMap[d][t] || 0),
         borderColor: TYPE_COLORS[t],
-        borderWidth: 1.5,
-        borderRadius: 4,
+        backgroundColor: TYPE_COLORS[t] + '22',
+        pointBackgroundColor: TYPE_COLORS[t],
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        borderWidth: 2,
+        tension: 0.3,
+        fill: false,
     }));
-
     chart = new Chart(document.getElementById('mainChart'), {
-        type: 'bar',
+        type: 'line',
         data: { labels, datasets },
         options: {
             responsive: true, maintainAspectRatio: false,
@@ -862,8 +889,8 @@ function renderChart(filtered) {
                 }
             },
             scales: {
-                x: { stacked: true, ticks: { color: '#b0b0b0', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
-                y: { stacked: true, ticks: { color: '#b0b0b0', font: { size: 10 }, callback: v => 'Rs.' + v }, grid: { color: 'rgba(255,255,255,0.04)' } }
+                x: { ticks: { color: '#b0b0b0', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: { ticks: { color: '#b0b0b0', font: { size: 10 }, callback: v => 'Rs.' + v }, grid: { color: 'rgba(255,255,255,0.04)' } }
             }
         }
     });
@@ -871,7 +898,6 @@ function renderChart(filtered) {
 
 // ── Render ────────────────────────────────────────────────────────────────────
 function render() {
-    // Totals & breakdown
     let total = 0, bPacked = 0, bReturned = 0, bPo = 0, bCustom = 0;
     entries.forEach(e => {
         total += e.earnings;
@@ -885,11 +911,9 @@ function render() {
     document.getElementById('brkReturned').textContent  = bReturned.toLocaleString();
     document.getElementById('brkPo').textContent        = bPo.toLocaleString();
     document.getElementById('brkCustom').textContent    = bCustom.toLocaleString();
-
     document.getElementById('undoBtn').disabled = undoStack.length === 0;
     document.getElementById('redoBtn').disabled = redoStack.length === 0;
 
-    // Apply filters
     const typeFilter = document.getElementById('filterType').value;
     const dayFilter  = document.getElementById('filterDay').value;
     let filtered = entries.filter(e => {
@@ -899,12 +923,10 @@ function render() {
         return true;
     });
 
-    // Chart
     const hasEntries = entries.length > 0;
     document.getElementById('chartWrap').style.display = hasEntries ? 'block' : 'none';
     if (hasEntries) renderChart(filtered);
 
-    // Table
     const list = document.getElementById('entriesList');
     list.innerHTML = '';
     if (!filtered.length) {
@@ -915,7 +937,6 @@ function render() {
         return;
     }
 
-    // Newest first — use original index for edit/delete
     const indexed = filtered.map((e, _) => ({ e, i: entries.indexOf(e) }));
     indexed.reverse().forEach(({ e, i }) => {
         const row = document.createElement('div');
