@@ -9,13 +9,15 @@ from flask import Flask, render_template, jsonify, request, abort
 
 # ── PyInstaller path resolution ──────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
     TEMPLATE_DIR = os.path.join(sys._MEIPASS, 'templates')
-    STATIC_DIR = os.path.join(sys._MEIPASS, 'static')
+    STATIC_DIR   = os.path.join(sys._MEIPASS, 'static')
     app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
 else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
     app = Flask(__name__)
+
+# Always write data to AppData — works for both dev and installed
+BASE_DIR = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'UniversalSHTools')
+os.makedirs(BASE_DIR, exist_ok=True)
 
 # ── Active credentials (driven entirely by profiles) ─────────────────────────
 active_creds = {
@@ -262,6 +264,13 @@ def fetch_order_data(order_identifier):
                         image_url = product_data["images"][0].get("src")
                     image_cache[product_id] = image_url
 
+        # Extract customized name from line item properties
+        properties = item.get('properties', [])
+        customized_name = next(
+            (p.get('value') for p in properties if p.get('name', '').lower() in ('customized name', 'custom name', 'name', 'personalization')),
+            None
+        )
+
         line_items.append({
             "product_id":         product_id,
             "variant_id":         variant_id,
@@ -271,7 +280,8 @@ def fetch_order_data(order_identifier):
             "size":               item.get('variant_title'),
             "product_image":      image_cache.get(product_id),
             "in_stock":           in_stock,
-            "available_quantity": available_quantity
+            "available_quantity": available_quantity,
+            "customized_name":    customized_name
         })
 
     return {
@@ -286,10 +296,112 @@ def fetch_order_data(order_identifier):
 # ROUTES - Navigation
 # ════════════════════════════════════════════════════════════════════════════
 
+# ════════════════════════════════════════════════════════════════════════════
+# DASHBOARD
+# ════════════════════════════════════════════════════════════════════════════
+
 @app.route('/')
 def home():
-    return render_template('index.html', active_page='scan')
+    return render_template('dashboard.html', active_page='dashboard')
 
+@app.route('/dashboard')
+def dashboard():
+    return render_template('dashboard.html', active_page='dashboard')
+
+@app.route('/api/dashboard', methods=['GET'])
+def api_dashboard():
+    result = {
+        'packed_today':        0,
+        'returned_today':      0,
+        'earnings_today':      0,
+        'earnings_entry_count': 0,
+        'urgent_count':        0,
+        'urgent_items':        [],
+    }
+
+    today_str = datetime.date.today().strftime('%d-%m-%Y')   # matches "Packed DD-MM-YYYY" tag format
+    today_iso = datetime.date.today().isoformat()            # matches accountant entry date format (YYYY-MM-DD)
+
+    # ── Packed today — count orders tagged "Packed DD-MM-YYYY" ──────────────
+    if credentials_ok():
+        try:
+            headers     = get_headers()
+            shopify_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders.json"
+            packed_tag  = f"Packed {today_str}"
+
+            # Shopify tag search
+            resp = requests.get(shopify_url, headers=headers, params={
+                'tag':    packed_tag,
+                'status': 'any',
+                'fields': 'id',
+                'limit':  250,
+            })
+            if resp.status_code == 200:
+                result['packed_today'] = len(resp.json().get('orders', []))
+        except Exception as e:
+            print(f"[DASHBOARD] packed_today error: {e}")
+
+        # ── Returned today — count orders tagged "Returned" updated today ───
+        try:
+            resp = requests.get(shopify_url, headers=headers, params={
+                'tag':            'Returned',
+                'status':         'any',
+                'fields':         'id,updated_at',
+                'limit':          250,
+                'updated_at_min': f"{today_iso}T00:00:00+00:00",
+            })
+            if resp.status_code == 200:
+                result['returned_today'] = len(resp.json().get('orders', []))
+        except Exception as e:
+            print(f"[DASHBOARD] returned_today error: {e}")
+
+        # ── Urgent stock ─────────────────────────────────────────────────────
+        try:
+            all_tags         = [cat["tag"] for cat in STOCK_CATEGORIES.values()]
+            tag_query_string = " OR ".join([f"tag:'{tag}'" for tag in all_tags])
+            gql_query = f"""
+            {{
+              products(first: 250, query: "({tag_query_string})") {{
+                edges {{
+                  node {{
+                    title
+                    variants(first: 1) {{
+                      edges {{ node {{ inventoryQuantity }} }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+            """
+            gql_data = run_graphql_query(gql_query)
+            if gql_data and 'errors' not in gql_data:
+                urgent = []
+                for edge in gql_data.get('data', {}).get('products', {}).get('edges', []):
+                    node = edge['node']
+                    if node['variants']['edges']:
+                        qty = node['variants']['edges'][0]['node']['inventoryQuantity']
+                        if qty < 0:
+                            urgent.append({
+                                'title':       node['title'],
+                                'current_qty': qty,
+                                'needed_qty':  abs(qty),
+                            })
+                urgent.sort(key=lambda p: p['needed_qty'], reverse=True)
+                result['urgent_items'] = urgent
+                result['urgent_count'] = len(urgent)
+        except Exception as e:
+            print(f"[DASHBOARD] urgent stock error: {e}")
+
+    # ── MA earnings today — read from accountant_data.json ──────────────────
+    try:
+        acc_data = load_accountant_data()
+        today_entries = [e for e in acc_data.get('entries', []) if e.get('date') == today_iso]
+        result['earnings_today']       = sum(e.get('earnings', 0) for e in today_entries)
+        result['earnings_entry_count'] = len(today_entries)
+    except Exception as e:
+        print(f"[DASHBOARD] earnings error: {e}")
+
+    return jsonify(result)
 @app.route('/scanpack')
 def scanpack():
     return render_template('index.html', active_page='scan')
@@ -355,6 +467,44 @@ def get_order_mark_paid(order_identifier):
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
     except Exception as e:
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
+    
+@app.route('/api/check_order_csv/<order_identifier>', methods=['GET'])
+def check_order_csv(order_identifier):
+    if not credentials_ok():
+        return jsonify({"error": "No store profile active.", "found": False}), 500
+    headers = get_headers()
+    shopify_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders.json"
+    clean = order_identifier.strip().lstrip('#')
+    params = {
+        "name":   f"#{clean}",
+        "status": "any",
+        "fields": "id,name,tags,financial_status,total_price"
+    }
+    try:
+        resp = requests.get(shopify_url, headers=headers, params=params)
+        # Handle rate limiting gracefully
+        if resp.status_code == 429:
+            import time
+            time.sleep(1)
+            resp = requests.get(shopify_url, headers=headers, params=params)
+        resp.raise_for_status()
+        orders = resp.json().get("orders", [])
+        if not orders:
+            return jsonify({"found": False, "error": "Order not found"}), 404
+        o = orders[0]
+        return jsonify({
+            "found":            True,
+            "order_id":         o.get("id"),
+            "order_name":       o.get("name"),
+            "tags":             o.get("tags", ""),
+            "financial_status": o.get("financial_status", ""),
+            "total_price":      o.get("total_price", "0"),
+        })
+    except requests.exceptions.HTTPError as e:
+        return jsonify({"found": False, "error": f"Shopify API error: {e.response.status_code}"}), e.response.status_code
+    except Exception as e:
+        return jsonify({"found": False, "error": str(e)}), 500
+
 
 @app.route('/api/tag_order', methods=['POST'])
 def tag_order_as_paid():

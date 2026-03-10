@@ -1,1 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — USHT</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
 
+/* ── Grid layout ── */
+.dash-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 18px;
+    margin-bottom: 28px;
+}
+
+/* ── Stat cards ── */
+.stat-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.15s;
+    text-decoration: none;
+    color: inherit;
+}
+.stat-card:hover {
+    border-color: var(--accent-color);
+    transform: translateY(-2px);
+}
+.stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--card-accent, var(--accent-color));
+    border-radius: 12px 12px 0 0;
+}
+.stat-label {
+    font-size: 0.75em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-dark);
+}
+.stat-value {
+    font-size: 2.4em;
+    font-weight: 700;
+    color: var(--text-light);
+    line-height: 1;
+}
+.stat-sub {
+    font-size: 0.8em;
+    color: var(--text-dark);
+    margin-top: 2px;
+}
+.stat-icon {
+    position: absolute;
+    top: 18px; right: 20px;
+    opacity: 0.08;
+    font-size: 3.2em;
+    line-height: 1;
+    pointer-events: none;
+}
+
+/* Card accent colours */
+.card-packed   { --card-accent: #22c55e; }
+.card-returned { --card-accent: #60a5fa; }
+.card-earnings { --card-accent: #e94560; }
+.card-urgent   { --card-accent: #f97316; }
+
+/* ── Section title ── */
+.dash-section-title {
+    color: var(--accent-color);
+    font-size: 0.82em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin: 0 0 14px 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* ── Urgent stock table ── */
+.urgent-wrap {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+}
+.urgent-head {
+    display: grid;
+    grid-template-columns: 1fr 100px 100px;
+    padding: 10px 18px;
+    background-color: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.75em;
+    font-weight: 700;
+    color: var(--text-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.urgent-list {
+    max-height: 340px;
+    overflow-y: auto;
+}
+.urgent-list::-webkit-scrollbar { width: 5px; }
+.urgent-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+
+.urgent-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 100px;
+    padding: 11px 18px;
+    border-bottom: 1px solid var(--border-color);
+    align-items: center;
+    font-size: 0.9em;
+    transition: background-color 0.15s;
+}
+.urgent-row:last-child { border-bottom: none; }
+.urgent-row:hover { background-color: var(--item-bg); }
+.urgent-name { color: var(--text-light); }
+.urgent-qty  { color: var(--text-dark); text-align: center; }
+.urgent-needed {
+    text-align: center;
+    font-weight: 700;
+    color: #f97316;
+}
+.urgent-empty {
+    padding: 36px 20px;
+    text-align: center;
+    color: var(--text-dark);
+    font-style: italic;
+}
+
+/* ── Quick links ── */
+.quick-links {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 28px;
+}
+.quick-link {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 16px 20px;
+    text-decoration: none;
+    color: var(--text-light);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95em;
+    font-weight: 600;
+    transition: border-color 0.2s, background-color 0.2s, transform 0.15s;
+}
+.quick-link:hover {
+    border-color: var(--accent-color);
+    background-color: var(--item-bg);
+    transform: translateY(-2px);
+}
+.quick-link svg { flex-shrink: 0; opacity: 0.7; }
+
+/* ── Refresh indicator ── */
+.refresh-bar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-bottom: 18px;
+    font-size: 0.8em;
+    color: var(--text-dark);
+}
+.refresh-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #22c55e;
+    display: inline-block;
+    animation: pulse 2s infinite;
+}
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.3; }
+}
+.refresh-btn {
+    background: none;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    color: var(--text-dark);
+    font-size: 0.85em;
+    padding: 3px 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    margin: 0;
+}
+.refresh-btn:hover { border-color: var(--accent-color); color: var(--text-light); transform: none; filter: none; }
+
+/* ── Loading skeleton ── */
+.skeleton {
+    background: linear-gradient(90deg, var(--border-color) 25%, var(--item-bg) 50%, var(--border-color) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.2s infinite;
+    border-radius: 4px;
+    height: 1em;
+    display: inline-block;
+    width: 60px;
+    vertical-align: middle;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ── Today label ── */
+.today-label {
+    font-size: 0.85em;
+    color: var(--text-dark);
+    margin-bottom: 20px;
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <h1 style="text-align:center;">Dashboard</h1>
+</header>
+
+<main class="app-main">
+    <div class="container">
+
+        <div class="refresh-bar">
+            <span class="refresh-dot"></span>
+            <span id="lastRefresh">Loading...</span>
+            <button class="refresh-btn" onclick="loadDashboard()">Refresh</button>
+        </div>
+
+        <p class="today-label" id="todayLabel"></p>
+
+        <!-- ── Stat cards ── -->
+        <div class="dash-grid">
+            <a href="/scanpack" class="stat-card card-packed">
+                <div class="stat-icon">&#128230;</div>
+                <div class="stat-label">Packed Today</div>
+                <div class="stat-value" id="statPacked"><span class="skeleton"></span></div>
+                <div class="stat-sub">Orders tagged Packed</div>
+            </a>
+            <a href="/returned" class="stat-card card-returned">
+                <div class="stat-icon">&#8617;</div>
+                <div class="stat-label">Returned Today</div>
+                <div class="stat-value" id="statReturned"><span class="skeleton"></span></div>
+                <div class="stat-sub">Orders tagged Returned</div>
+            </a>
+            <a href="/accountant" class="stat-card card-earnings">
+                <div class="stat-icon">&#128181;</div>
+                <div class="stat-label">MA Earnings Today</div>
+                <div class="stat-value" id="statEarnings"><span class="skeleton"></span></div>
+                <div class="stat-sub" id="statEarningsSub">From accountant entries</div>
+            </a>
+            <a href="/stock" class="stat-card card-urgent">
+                <div class="stat-icon">&#9888;</div>
+                <div class="stat-label">Urgent Stock Items</div>
+                <div class="stat-value" id="statUrgent"><span class="skeleton"></span></div>
+                <div class="stat-sub">Products below zero</div>
+            </a>
+        </div>
+
+        <!-- ── Urgent stock list ── -->
+        <h3 class="dash-section-title">Urgent Stock</h3>
+        <div class="urgent-wrap">
+            <div class="urgent-head">
+                <span>Product</span>
+                <span style="text-align:center;">In Stock</span>
+                <span style="text-align:center;">Needed</span>
+            </div>
+            <div class="urgent-list" id="urgentList">
+                <div class="urgent-empty">Loading...</div>
+            </div>
+        </div>
+
+        <!-- ── Quick links ── -->
+        <div class="quick-links">
+            <a href="/scanpack" class="quick-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                Scan and Pack
+            </a>
+            <a href="/markpaid" class="quick-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                Mark as Paid
+            </a>
+            <a href="/returned" class="quick-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.5"/></svg>
+                Mark as Returned
+            </a>
+            <a href="/stock" class="quick-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                Stock App
+            </a>
+            <a href="/deduct" class="quick-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                QTY Deduction
+            </a>
+            <a href="/accountant" class="quick-link">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                My Accountant
+            </a>
+        </div>
+
+    </div>
+</main>
+
+<footer class="app-footer">
+    {% include 'navigation.html' %}
+</footer>
+
+<script>
+let refreshTimer = null;
+
+function formatTime(date) {
+    return date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function setTodayLabel() {
+    const today = new Date();
+    const opts  = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    document.getElementById('todayLabel').textContent = today.toLocaleDateString('en-GB', opts);
+}
+
+async function loadDashboard() {
+    try {
+        const res  = await fetch('/api/dashboard');
+        const data = await res.json();
+
+        // Stat cards
+        document.getElementById('statPacked').textContent   = data.packed_today ?? '—';
+        document.getElementById('statReturned').textContent = data.returned_today ?? '—';
+
+        const earn = data.earnings_today ?? 0;
+        document.getElementById('statEarnings').textContent = earn > 0 ? `Rs.${earn.toLocaleString()}` : '—';
+        document.getElementById('statEarningsSub').textContent =
+            data.earnings_entry_count > 0
+                ? `${data.earnings_entry_count} entr${data.earnings_entry_count === 1 ? 'y' : 'ies'} today`
+                : 'No entries today';
+
+        document.getElementById('statUrgent').textContent = data.urgent_count ?? '—';
+
+        // Urgent list
+        const list = document.getElementById('urgentList');
+        list.innerHTML = '';
+        if (!data.urgent_items || data.urgent_items.length === 0) {
+            list.innerHTML = '<div class="urgent-empty">No urgent stock items — all good!</div>';
+        } else {
+            data.urgent_items.forEach(item => {
+                const row = document.createElement('div');
+                row.className = 'urgent-row';
+                row.innerHTML = `
+                    <span class="urgent-name">${item.title}</span>
+                    <span class="urgent-qty">${item.current_qty}</span>
+                    <span class="urgent-needed">+${item.needed_qty}</span>
+                `;
+                list.appendChild(row);
+            });
+        }
+
+        document.getElementById('lastRefresh').textContent = `Last updated ${formatTime(new Date())}`;
+
+    } catch (e) {
+        console.error('Dashboard load failed:', e);
+        document.getElementById('lastRefresh').textContent = 'Failed to load — retrying...';
+    }
+}
+
+function startAutoRefresh() {
+    clearInterval(refreshTimer);
+    refreshTimer = setInterval(loadDashboard, 45000); // every 45 seconds
+}
+
+setTodayLabel();
+loadDashboard();
+startAutoRefresh();
+</script>
+</body>
+</html>
