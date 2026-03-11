@@ -5,6 +5,62 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QTY Deduction</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style5.css') }}">
+    <style>
+        /* ── Search slide-down bar ── */
+        .search-bar-wrap {
+            display: none;
+            margin-top: 8px;
+        }
+        .search-bar-wrap.open {
+            display: block;
+            animation: slideDown 0.15s ease;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .search-bar-wrap input[type="text"] {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--input-border);
+            border-radius: 6px;
+            background: var(--input-bg);
+            color: var(--text-light);
+            font-size: 0.95em;
+            box-sizing: border-box;
+            margin-bottom: 0;
+        }
+        .search-bar-wrap input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+        #skuList li.search-hidden { display: none !important; }
+
+        #searchCount {
+            font-size: 0.8em;
+            color: var(--text-dark);
+            margin-left: 6px;
+        }
+
+        /* Search icon button — matches btn-confirm / btn-clear sizing */
+        .btn-icon-search {
+            padding: 11px 14px;
+            background-color: var(--accent-color);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: filter 0.2s, transform 0.15s;
+        }
+        .btn-icon-search:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-icon-search:active { transform: translateY(0); }
+        .btn-icon-search.active { background-color: var(--input-border); }
+    </style>
 </head>
 <body>
     <header class="app-header">
@@ -12,6 +68,7 @@
     </header>
     <main class="app-main">
         <div class="qd-layout">
+
             <!-- LEFT PANEL -->
             <div class="qd-left">
                 <div class="qd-card">
@@ -46,16 +103,31 @@
                         &#10003; Confirm &amp; Deduct
                     </button>
                     <button onclick="clearAll()" class="btn-clear">&#10005; Clear All</button>
+                    <button class="btn-icon-search" id="searchToggleBtn" onclick="toggleSearch()" title="Search SKU queue (Ctrl+F)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    </button>
                 </div>
                 <div id="statusMessage" class="status-message" style="display:none;"></div>
             </div>
+
             <!-- RIGHT PANEL -->
             <div class="qd-right">
                 <div class="qd-card qd-list-card">
                     <div class="list-header">
                         <h3 class="qd-card-title" style="margin:0">SKU Queue</h3>
-                        <span id="listHint" class="list-hint">No items yet</span>
+                        <span id="listHint" class="list-hint">No items yet
+                            <span id="searchCount" style="display:none;"></span>
+                        </span>
                     </div>
+
+                    <!-- Search bar (hidden by default) -->
+                    <div class="search-bar-wrap" id="searchBarWrap">
+                        <input type="text" id="searchInput"
+                               placeholder="Search SKUs..."
+                               oninput="filterSkuList(this.value)"
+                               onkeydown="if(event.key==='Escape') toggleSearch()">
+                    </div>
+
                     <div class="list-cols" id="listCols" style="display:none">
                         <span>#</span><span>SKU</span><span>Qty</span><span>Actions</span>
                     </div>
@@ -70,6 +142,7 @@
                     <div id="resultsLog" class="results-log"></div>
                 </div>
             </div>
+
         </div>
     </main>
     <footer class="app-footer">

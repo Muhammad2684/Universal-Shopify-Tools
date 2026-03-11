@@ -250,3 +250,248 @@ async function markAllAsPaid() {
     queuedOrders = [];
     updateTotalAmount();
 }
+
+// ════════════════════════════════════════════════════════════════════════════
+// SEARCH  —  paste these functions at the bottom of main2.js
+// ════════════════════════════════════════════════════════════════════════════
+
+function toggleSearch() {
+    const wrap = document.getElementById('searchBarWrap');
+    const btn  = document.getElementById('searchToggleBtn');
+    const isOpen = wrap.classList.contains('open');
+    if (isOpen) {
+        wrap.classList.remove('open');
+        btn.classList.remove('active');
+        document.getElementById('searchInput').value = '';
+        filterOrderList('');
+    } else {
+        wrap.classList.add('open');
+        btn.classList.add('active');
+        setTimeout(() => document.getElementById('searchInput').focus(), 40);
+    }
+}
+
+function filterOrderList(query) {
+    const q     = query.trim().toLowerCase();
+    const items = document.querySelectorAll('#orderList li');
+    let visible = 0;
+    items.forEach(li => {
+        const match = !q || li.textContent.toLowerCase().includes(q);
+        li.classList.toggle('search-hidden', !match);
+        if (match) visible++;
+    });
+    const countEl = document.getElementById('searchCount');
+    if (countEl) {
+        if (q && items.length > 0) {
+            countEl.textContent   = `(${visible} shown)`;
+            countEl.style.display = 'inline';
+        } else {
+            countEl.style.display = 'none';
+        }
+    }
+}
+
+document.addEventListener('keydown', function (e) {
+    const searchOpen = document.getElementById('searchBarWrap').classList.contains('open');
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        if (!searchOpen) toggleSearch();
+        else document.getElementById('searchInput').focus();
+        return;
+    }
+    if (e.key === 'Escape' && searchOpen) {
+        toggleSearch();
+        return;
+    }
+});
+
+
+// ════════════════════════════════════════════════════════════════════════════
+// SESSION MEMORY + COLUMN TOGGLES + SEARCH
+// Paste at the bottom of main2.js — replace any existing window.onload.
+// ════════════════════════════════════════════════════════════════════════════
+
+const MAP_SESSION_KEY = 'markpaid_state';
+const MAP_PREFS_KEY   = 'markpaid_prefs';   // localStorage — survives app restart
+
+// ── Column visibility state ────────────────────────────────────────────────
+// cols.city   = true/false
+// cols.amount = true/false
+let colState = { city: true, amount: true };
+
+function loadPrefs() {
+    try {
+        const raw = localStorage.getItem(MAP_PREFS_KEY);
+        if (raw) colState = Object.assign(colState, JSON.parse(raw));
+    } catch (e) {}
+}
+
+function savePrefs() {
+    localStorage.setItem(MAP_PREFS_KEY, JSON.stringify(colState));
+}
+
+function applyColState() {
+    // City columns
+    document.querySelectorAll('.col-city').forEach(el => {
+        el.style.display = colState.city ? '' : 'none';
+    });
+    // Amount columns
+    document.querySelectorAll('.col-amount').forEach(el => {
+        el.style.display = colState.amount ? '' : 'none';
+    });
+    // Toggle button active states
+    const btnCity   = document.getElementById('togCity');
+    const btnAmount = document.getElementById('togAmount');
+    if (btnCity)   btnCity.classList.toggle('on',   colState.city);
+    if (btnAmount) btnAmount.classList.toggle('on', colState.amount);
+}
+
+function toggleColumn(col) {
+    colState[col] = !colState[col];
+    applyColState();
+    savePrefs();
+}
+
+// ── Patched renderOrderToList — adds City + Amount as column cells ─────────
+// Replaces the original so city and amount cells respect colState.
+const _origRender = renderOrderToList;
+renderOrderToList = function(order, index) {
+    const li = document.createElement('li');
+    li.dataset.id = order.order_id;
+    li.style.cssText = 'display:flex; align-items:center; gap:10px;';
+
+    const cityVal   = order.city   || '—';
+    const priceVal  = parseFloat(order.total_price || 0).toFixed(2);
+
+    li.innerHTML = `
+        <div style="width:40px;text-align:left;"><strong>${index}</strong></div>
+        <div style="flex-grow:1;text-align:left;">${order.order_name}</div>
+        <div class="col-city"   style="min-width:100px;display:${colState.city   ? '' : 'none'};">${cityVal}</div>
+        <div class="col-amount" style="min-width:120px;text-align:right;display:${colState.amount ? '' : 'none'};">Rs. ${priceVal}</div>
+    `;
+    orderList.appendChild(li);
+    saveSessionState();
+};
+
+// ── Session state (orders list) ────────────────────────────────────────────
+
+function saveSessionState() {
+    sessionStorage.setItem(MAP_SESSION_KEY, JSON.stringify({ queuedOrders }));
+}
+
+function loadSessionState() {
+    try {
+        const raw = sessionStorage.getItem(MAP_SESSION_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            queuedOrders = parsed.queuedOrders || [];
+        }
+    } catch (e) {}
+}
+
+function restoreUI() {
+    if (!queuedOrders.length) return;
+
+    orderList.innerHTML = '';
+    // Use patched renderOrderToList so city/amount cols are correct
+    queuedOrders.forEach((order, idx) => renderOrderToList(order, idx + 1));
+
+    document.getElementById('orderListHeader').style.display = 'flex';
+    document.getElementById('orderTotal').style.display      = 'block';
+    document.getElementById('colToggleBar').style.display    = 'flex';
+    updateTotalAmount();
+}
+
+// Show column toggle bar whenever list header becomes visible
+const _origAddOrder = addOrder;
+addOrder = async function(orderNumber = null) {
+    await _origAddOrder(orderNumber);
+    // Show col toggle bar once at least one order is in the list
+    if (queuedOrders.length > 0) {
+        document.getElementById('colToggleBar').style.display = 'flex';
+    }
+};
+
+// Patch clearAll — wipe session too
+const _origClearAll = clearAll;
+clearAll = function() {
+    _origClearAll();
+    sessionStorage.removeItem(MAP_SESSION_KEY);
+    document.getElementById('colToggleBar').style.display = 'none';
+};
+
+// Patch markAllAsPaid — wipe session after tagging done
+const _origMarkAll = markAllAsPaid;
+markAllAsPaid = async function() {
+    await _origMarkAll();
+    sessionStorage.removeItem(MAP_SESSION_KEY);
+};
+
+// Patch CSV confirm button to also show col toggle bar
+const _csvConfirmBtn = document.getElementById('confirmCsvOrders');
+if (_csvConfirmBtn) {
+    const _origClick = _csvConfirmBtn.onclick;
+    _csvConfirmBtn.addEventListener('click', () => {
+        setTimeout(() => {
+            if (queuedOrders.length > 0) {
+                document.getElementById('colToggleBar').style.display = 'flex';
+            }
+        }, 100);
+    });
+}
+
+// ── Search ─────────────────────────────────────────────────────────────────
+
+function toggleSearch() {
+    const wrap   = document.getElementById('searchBarWrap');
+    const btn    = document.getElementById('searchToggleBtn');
+    const isOpen = wrap.classList.contains('open');
+    if (isOpen) {
+        wrap.classList.remove('open');
+        btn.classList.remove('active');
+        document.getElementById('searchInput').value = '';
+        filterOrderList('');
+    } else {
+        wrap.classList.add('open');
+        btn.classList.add('active');
+        setTimeout(() => document.getElementById('searchInput').focus(), 40);
+    }
+}
+
+function filterOrderList(query) {
+    const q     = query.trim().toLowerCase();
+    const items = document.querySelectorAll('#orderList li');
+    let visible = 0;
+    items.forEach(li => {
+        const match = !q || li.textContent.toLowerCase().includes(q);
+        li.classList.toggle('search-hidden', !match);
+        if (match) visible++;
+    });
+    const countEl = document.getElementById('searchCount');
+    if (countEl) {
+        countEl.textContent   = (q && items.length) ? `(${visible} shown)` : '';
+        countEl.style.display = (q && items.length) ? 'inline' : 'none';
+    }
+}
+
+document.addEventListener('keydown', function(e) {
+    const wrap       = document.getElementById('searchBarWrap');
+    const searchOpen = wrap && wrap.classList.contains('open');
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        if (!searchOpen) toggleSearch();
+        else document.getElementById('searchInput').focus();
+        return;
+    }
+    if (e.key === 'Escape' && searchOpen) { toggleSearch(); return; }
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+window.onload = () => {
+    loadPrefs();
+    loadSessionState();
+    applyColState();
+    restoreUI();
+    document.getElementById('orderInput').focus();
+};

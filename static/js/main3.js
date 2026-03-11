@@ -374,8 +374,230 @@ async function addEntryToAccountant() {
     }
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// SEARCH  —  paste at the bottom of main3.js
+// Replace the existing window.onload block with the one at the end of this file.
+// ════════════════════════════════════════════════════════════════════════════
+
+function toggleSearch() {
+    const wrap   = document.getElementById('searchBarWrap');
+    const btn    = document.getElementById('searchToggleBtn');
+    const isOpen = wrap.classList.contains('open');
+    if (isOpen) {
+        wrap.classList.remove('open');
+        btn.classList.remove('active');
+        document.getElementById('searchInput').value = '';
+        filterPackedList('');
+    } else {
+        wrap.classList.add('open');
+        btn.classList.add('active');
+        setTimeout(() => document.getElementById('searchInput').focus(), 40);
+    }
+}
+
+function filterPackedList(query) {
+    const q     = query.trim().toLowerCase();
+    const items = document.querySelectorAll('#packedOrdersList li');
+    let visible = 0;
+    items.forEach(li => {
+        const match = !q || li.textContent.toLowerCase().includes(q);
+        li.classList.toggle('search-hidden', !match);
+        if (match) visible++;
+    });
+    const countEl = document.getElementById('searchCount');
+    if (countEl) {
+        countEl.textContent   = (q && items.length) ? `(showing ${visible})` : '';
+        countEl.style.display = (q && items.length) ? 'inline' : 'none';
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// F-KEY SHORTCUT
+//
+// The operator presses the F-key matching the total number of items in the
+// order (e.g. 5 items → F5). Each press increments ALL items by 1.
+//
+// After incrementing:
+//   - All items at max qty → auto-fires markOrderAsPacked() (mark returned)
+//   - Some items still short → popup listing the short items with option
+//     to force-confirm (fills remaining qty + marks returned) or cancel
+//
+// ════════════════════════════════════════════════════════════════════════════
+
+function incrementAllItems() {
+    if (!currentOrder) return;
+    currentOrder.line_items.forEach(item => {
+        if (itemCounters[item.variant_id] < item.quantity) {
+            itemCounters[item.variant_id]++;
+            updateItemDisplay(item.variant_id);
+        }
+    });
+    saveState();
+}
+
+function getShortItems() {
+    if (!currentOrder) return [];
+    return currentOrder.line_items.filter(
+        item => itemCounters[item.variant_id] < item.quantity
+    );
+}
+
+function forceCompleteAndMark() {
+    if (!currentOrder) return;
+    currentOrder.line_items.forEach(item => {
+        itemCounters[item.variant_id] = item.quantity;
+        updateItemDisplay(item.variant_id);
+    });
+    checkPackingCompletion();
+    saveState();
+    markOrderAsPacked();
+}
+
+function showShortItemsPopup(shortItems) {
+    return new Promise(resolve => {
+        const existing = document.getElementById('fkey-popup');
+        if (existing) existing.remove();
+
+        const itemRows = shortItems.map(item => {
+            const have  = itemCounters[item.variant_id];
+            const need  = item.quantity;
+            const label = item.title + (item.size ? ` — ${item.size}` : '');
+            return `<div style="
+                display:flex; justify-content:space-between; align-items:center;
+                padding:7px 10px; margin-bottom:6px;
+                background:var(--item-bg); border-radius:6px;
+                font-size:0.88em; color:var(--text-light);
+            ">
+                <span style="text-align:left; flex:1;">${label}</span>
+                <span style="
+                    margin-left:12px; white-space:nowrap;
+                    color:var(--accent-color); font-weight:bold;
+                ">${have} / ${need}</span>
+            </div>`;
+        }).join('');
+
+        const overlay = document.createElement('div');
+        overlay.id = 'fkey-popup';
+        overlay.style.cssText = `
+            position:fixed; inset:0;
+            background:rgba(0,0,0,0.6);
+            backdrop-filter:blur(4px);
+            z-index:9000;
+            display:flex; align-items:center; justify-content:center;
+        `;
+        overlay.innerHTML = `
+            <div style="
+                background:var(--bg-secondary);
+                border:1px solid var(--accent-color);
+                border-radius:12px;
+                padding:26px 28px;
+                min-width:320px; max-width:460px;
+                box-shadow:0 16px 48px rgba(0,0,0,0.65);
+            ">
+                <p style="margin:0 0 4px; font-size:0.75em; font-weight:700;
+                    text-transform:uppercase; letter-spacing:0.06em;
+                    color:var(--accent-color);">Some items not fully checked</p>
+                <p style="margin:0 0 14px; font-size:0.88em; color:var(--text-dark);">
+                    The following items still need more scans:
+                </p>
+                <div style="margin-bottom:18px;">${itemRows}</div>
+                <p style="margin:0 0 18px; font-size:0.85em; color:var(--text-light);">
+                    Confirm anyway? The app will fill the remaining quantities and mark the order as returned.
+                </p>
+                <div style="display:flex; gap:10px; justify-content:flex-end;">
+                    <button id="fkey-no" style="
+                        padding:9px 22px; background:none;
+                        color:var(--text-dark); border:1px solid var(--border-color);
+                        border-radius:7px; font-size:0.9em; cursor:pointer;
+                    ">Cancel</button>
+                    <button id="fkey-yes" style="
+                        padding:9px 22px; background:var(--accent-color);
+                        color:#fff; border:none; border-radius:7px;
+                        font-size:0.9em; font-weight:bold; cursor:pointer;
+                    ">Confirm &amp; Mark Returned</button>
+                </div>
+                <p style="margin:12px 0 0; font-size:0.72em; color:var(--text-dark); text-align:right;">
+                    <kbd style="background:var(--item-bg);border:1px solid var(--border-color);border-radius:3px;padding:1px 5px;font-family:monospace;">Enter</kbd> Confirm &nbsp;
+                    <kbd style="background:var(--item-bg);border:1px solid var(--border-color);border-radius:3px;padding:1px 5px;font-family:monospace;">Esc</kbd> Cancel
+                </p>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        function close(result) {
+            overlay.remove();
+            document.removeEventListener('keydown', onKey);
+            resolve(result);
+        }
+        function onKey(e) {
+            if (e.key === 'Enter')  { e.preventDefault(); close(true);  }
+            if (e.key === 'Escape') { e.preventDefault(); close(false); }
+        }
+
+        document.getElementById('fkey-yes').onclick = () => close(true);
+        document.getElementById('fkey-no').onclick  = () => close(false);
+        document.addEventListener('keydown', onKey);
+        document.getElementById('fkey-yes').focus();
+    });
+}
+
+async function handleFKey(pressedNum) {
+    if (!currentOrder) return;
+
+    const totalItems = currentOrder.line_items.length;
+    if (pressedNum !== totalItems) return;
+
+    incrementAllItems();
+
+    const short = getShortItems();
+    if (short.length === 0) {
+        checkPackingCompletion();
+        markOrderAsPacked();
+        return;
+    }
+
+    const confirmed = await showShortItemsPopup(short);
+    if (confirmed) forceCompleteAndMark();
+}
+
+// ── Replace your existing window.onload ────────────────────────────────────
+
 window.onload = () => {
     loadState();
     restoreUI();
     orderIdInput.focus();
 };
+
+document.addEventListener('keydown', function (e) {
+    const searchOpen = document.getElementById('searchBarWrap').classList.contains('open');
+    const onOrderIn  = document.activeElement === orderIdInput;
+    const popupOpen  = !!document.getElementById('fkey-popup');
+
+    // F1–F10 — operator presses F-key = total item count in order
+    if (/^F([1-9]|10)$/.test(e.key) && !e.altKey && !e.ctrlKey && !e.metaKey && !popupOpen) {
+        const num = parseInt(e.key.slice(1), 10);
+        if (currentOrder) { e.preventDefault(); handleFKey(num); }
+        return;
+    }
+
+    // Enter — load order from input field
+    if (e.key === 'Enter' && onOrderIn) {
+        e.preventDefault();
+        fetchOrder();
+        return;
+    }
+
+    // Escape — close search first, then clear order
+    if (e.key === 'Escape' && !popupOpen) {
+        if (searchOpen) { toggleSearch(); return; }
+        if (currentOrder) { clearOrder(); return; }
+    }
+
+    // Ctrl+F — open / re-focus search
+    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        if (!searchOpen) toggleSearch();
+        else document.getElementById('searchInput').focus();
+        return;
+    }
+});
