@@ -264,7 +264,6 @@ def fetch_order_data(order_identifier):
                         image_url = product_data["images"][0].get("src")
                     image_cache[product_id] = image_url
 
-        # Extract customized name from line item properties
         properties = item.get('properties', [])
         customized_name = next(
             (p.get('value') for p in properties if p.get('name', '').lower() in ('customized name', 'custom name', 'name', 'personalization')),
@@ -289,12 +288,10 @@ def fetch_order_data(order_identifier):
         "order_name":         order.get('name'),
         "line_items":         line_items,
         "fulfillment_status": order.get('fulfillment_status'),
-        "tags":               order.get('tags', '')
+        "tags":               order.get('tags', ''),
+        "city":               (order.get('shipping_address') or {}).get('city', ''),
+        "total_price":        order.get('total_price', '0'),
     }, None, 200
-
-# ════════════════════════════════════════════════════════════════════════════
-# ROUTES - Navigation
-# ════════════════════════════════════════════════════════════════════════════
 
 # ════════════════════════════════════════════════════════════════════════════
 # DASHBOARD
@@ -319,43 +316,32 @@ def api_dashboard():
         'urgent_items':        [],
     }
 
-    today_str = datetime.date.today().strftime('%d-%m-%Y')   # matches "Packed DD-MM-YYYY" tag format
-    today_iso = datetime.date.today().isoformat()            # matches accountant entry date format (YYYY-MM-DD)
+    today_str = datetime.date.today().strftime('%d-%m-%Y')
+    today_iso = datetime.date.today().isoformat()
 
-    # ── Packed today — count orders tagged "Packed DD-MM-YYYY" ──────────────
     if credentials_ok():
         try:
             headers     = get_headers()
             shopify_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders.json"
             packed_tag  = f"Packed {today_str}"
-
-            # Shopify tag search
             resp = requests.get(shopify_url, headers=headers, params={
-                'tag':    packed_tag,
-                'status': 'any',
-                'fields': 'id',
-                'limit':  250,
+                'tag': packed_tag, 'status': 'any', 'fields': 'id', 'limit': 250,
             })
             if resp.status_code == 200:
                 result['packed_today'] = len(resp.json().get('orders', []))
         except Exception as e:
             print(f"[DASHBOARD] packed_today error: {e}")
 
-        # ── Returned today — count orders tagged "Returned" updated today ───
         try:
             resp = requests.get(shopify_url, headers=headers, params={
-                'tag':            'Returned',
-                'status':         'any',
-                'fields':         'id,updated_at',
-                'limit':          250,
-                'updated_at_min': f"{today_iso}T00:00:00+00:00",
+                'tag': 'Returned', 'status': 'any', 'fields': 'id,updated_at',
+                'limit': 250, 'updated_at_min': f"{today_iso}T00:00:00+00:00",
             })
             if resp.status_code == 200:
                 result['returned_today'] = len(resp.json().get('orders', []))
         except Exception as e:
             print(f"[DASHBOARD] returned_today error: {e}")
 
-        # ── Urgent stock ─────────────────────────────────────────────────────
         try:
             all_tags         = [cat["tag"] for cat in STOCK_CATEGORIES.values()]
             tag_query_string = " OR ".join([f"tag:'{tag}'" for tag in all_tags])
@@ -381,18 +367,13 @@ def api_dashboard():
                     if node['variants']['edges']:
                         qty = node['variants']['edges'][0]['node']['inventoryQuantity']
                         if qty < 0:
-                            urgent.append({
-                                'title':       node['title'],
-                                'current_qty': qty,
-                                'needed_qty':  abs(qty),
-                            })
+                            urgent.append({'title': node['title'], 'current_qty': qty, 'needed_qty': abs(qty)})
                 urgent.sort(key=lambda p: p['needed_qty'], reverse=True)
                 result['urgent_items'] = urgent
                 result['urgent_count'] = len(urgent)
         except Exception as e:
             print(f"[DASHBOARD] urgent stock error: {e}")
 
-    # ── MA earnings today — read from accountant_data.json ──────────────────
     try:
         acc_data = load_accountant_data()
         today_entries = [e for e in acc_data.get('entries', []) if e.get('date') == today_iso]
@@ -402,6 +383,7 @@ def api_dashboard():
         print(f"[DASHBOARD] earnings error: {e}")
 
     return jsonify(result)
+
 @app.route('/scanpack')
 def scanpack():
     return render_template('index.html', active_page='scan')
@@ -467,7 +449,7 @@ def get_order_mark_paid(order_identifier):
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
     except Exception as e:
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
-    
+
 @app.route('/api/check_order_csv/<order_identifier>', methods=['GET'])
 def check_order_csv(order_identifier):
     if not credentials_ok():
@@ -478,11 +460,10 @@ def check_order_csv(order_identifier):
     params = {
         "name":   f"#{clean}",
         "status": "any",
-        "fields": "id,name,tags,financial_status,total_price"
+        "fields": "id,name,tags,financial_status,total_price,shipping_address"
     }
     try:
         resp = requests.get(shopify_url, headers=headers, params=params)
-        # Handle rate limiting gracefully
         if resp.status_code == 429:
             import time
             time.sleep(1)
@@ -499,12 +480,12 @@ def check_order_csv(order_identifier):
             "tags":             o.get("tags", ""),
             "financial_status": o.get("financial_status", ""),
             "total_price":      o.get("total_price", "0"),
+            "city":             (o.get("shipping_address") or {}).get("city", ""),
         })
     except requests.exceptions.HTTPError as e:
         return jsonify({"found": False, "error": f"Shopify API error: {e.response.status_code}"}), e.response.status_code
     except Exception as e:
         return jsonify({"found": False, "error": str(e)}), 500
-
 
 @app.route('/api/tag_order', methods=['POST'])
 def tag_order_as_paid():

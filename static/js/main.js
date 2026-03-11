@@ -116,6 +116,54 @@ function clearMessage() {
     statusMessageDiv.style.display = 'none';
 }
 
+function playBeep() {
+    // Success — high short ping
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.15);
+    } catch(e) {}
+}
+
+function playError() {
+    // Error — low buzz
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
+        osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.35);
+    } catch(e) {}
+}
+
+function playPopup() {
+    // Popup — two-tone chime
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [660, 440].forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            osc.type = 'sine';
+            const t = ctx.currentTime + i * 0.12;
+            osc.frequency.setValueAtTime(freq, t);
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+            osc.start(t); osc.stop(t + 0.12);
+        });
+    } catch(e) {}
+}
+
 async function fetchOrder() {
     const orderIdentifier = orderIdInput.value.trim();
     if (!orderIdentifier) {
@@ -194,6 +242,7 @@ async function fetchOrder() {
 
     } catch (error) {
         showMessage(`Error: ${error.message}`, "error");
+        playError();
         console.error("Fetch order error:", error);
     } finally {
         orderIdInput.value = '';
@@ -281,12 +330,14 @@ async function markOrderAsPacked() {
             return;
         }
 
+        playBeep();
         showMessage(`Order ${currentOrder.order_name} successfully fulfilled!`, "success");
         addPackedOrder(currentOrder.order_name);
         clearOrder();
 
     } catch (error) {
         showMessage(`Error: ${error.message}`, "error");
+        playError();
         console.error("Fulfillment error:", error);
     } finally {
         orderIdInput.focus();
@@ -379,8 +430,7 @@ async function addEntryToAccountant() {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// SEARCH  —  paste at the bottom of main.js
-// Replace the existing window.onload block with the one at the end of this file.
+// SEARCH
 // ════════════════════════════════════════════════════════════════════════════
 
 function toggleSearch() {
@@ -417,18 +467,8 @@ function filterPackedList(query) {
 
 // ════════════════════════════════════════════════════════════════════════════
 // F-KEY SHORTCUT
-//
-// The operator presses the F-key matching the total number of items in the
-// order (e.g. 5 items → F5). Each press increments ALL items by 1.
-//
-// After incrementing:
-//   - All items at max qty → auto-fires markOrderAsPacked()
-//   - Some items still short → popup listing the short items with option
-//     to force-confirm (fills remaining qty + marks packed) or cancel
-//
 // ════════════════════════════════════════════════════════════════════════════
 
-// Increment every item in the order by 1 (capped at its required qty)
 function incrementAllItems() {
     if (!currentOrder) return;
     currentOrder.line_items.forEach(item => {
@@ -440,7 +480,6 @@ function incrementAllItems() {
     saveState();
 }
 
-// Returns array of items that haven't reached required qty yet
 function getShortItems() {
     if (!currentOrder) return [];
     return currentOrder.line_items.filter(
@@ -448,19 +487,17 @@ function getShortItems() {
     );
 }
 
-// Force-fill all remaining items to their required qty then mark packed
 function forceCompleteAndMark() {
     if (!currentOrder) return;
     currentOrder.line_items.forEach(item => {
         itemCounters[item.variant_id] = item.quantity;
         updateItemDisplay(item.variant_id);
     });
-    checkPackingCompletion(); // enables button
+    checkPackingCompletion();
     saveState();
     markOrderAsPacked();
 }
 
-// Popup listing short items — operator can confirm (force complete) or cancel
 function showShortItemsPopup(shortItems) {
     return new Promise(resolve => {
         const existing = document.getElementById('fkey-popup');
@@ -531,6 +568,7 @@ function showShortItemsPopup(shortItems) {
             </div>
         `;
         document.body.appendChild(overlay);
+        playPopup();
 
         function close(result) {
             overlay.remove();
@@ -552,28 +590,21 @@ function showShortItemsPopup(shortItems) {
 async function handleFKey(pressedNum) {
     if (!currentOrder) return;
 
-    // Only react if the pressed number matches total item count
     const totalItems = currentOrder.line_items.length;
     if (pressedNum !== totalItems) return;
 
-    // Increment all items by 1
     incrementAllItems();
 
-    // Check if all done
     const short = getShortItems();
     if (short.length === 0) {
-        // All items at max — mark automatically
         checkPackingCompletion();
         markOrderAsPacked();
         return;
     }
 
-    // Not all done — show popup with short items
     const confirmed = await showShortItemsPopup(short);
     if (confirmed) forceCompleteAndMark();
 }
-
-// ── Replace your existing window.onload ────────────────────────────────────
 
 window.onload = () => {
     loadState();
@@ -586,27 +617,23 @@ document.addEventListener('keydown', function (e) {
     const onOrderIn  = document.activeElement === orderIdInput;
     const popupOpen  = !!document.getElementById('fkey-popup');
 
-    // F1–F10 — the operator presses the F-key = total item count
     if (/^F([1-9]|10)$/.test(e.key) && !e.altKey && !e.ctrlKey && !e.metaKey && !popupOpen) {
         const num = parseInt(e.key.slice(1), 10);
         if (currentOrder) { e.preventDefault(); handleFKey(num); }
         return;
     }
 
-    // Enter — load order from input field
     if (e.key === 'Enter' && onOrderIn) {
         e.preventDefault();
         fetchOrder();
         return;
     }
 
-    // Escape — close search first, then clear order
     if (e.key === 'Escape' && !popupOpen) {
         if (searchOpen) { toggleSearch(); return; }
         if (currentOrder) { clearOrder(); return; }
     }
 
-    // Ctrl+F — open / re-focus search
     if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         if (!searchOpen) toggleSearch();
