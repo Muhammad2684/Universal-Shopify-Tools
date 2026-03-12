@@ -93,6 +93,50 @@ def credentials_ok():
     return bool(SHOPIFY_STORE_URL() and SHOPIFY_ACCESS_TOKEN())
 
 # ════════════════════════════════════════════════════════════════════════════
+# VERSION / UPDATE CHECK
+# ════════════════════════════════════════════════════════════════════════════
+
+# The current version of this build — bump this string whenever you release.
+APP_VERSION = "1.0.0"
+
+# Raw URL of version.json in your GitHub repo.
+# Replace with your actual repo URL once you create the file there.
+VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
+
+@app.route('/api/check_update', methods=['GET'])
+def check_update():
+    try:
+        resp = requests.get(VERSION_URL, timeout=5)
+        resp.raise_for_status()
+        remote = resp.json()
+        remote_version = remote.get("version", "0.0.0")
+        notes          = remote.get("notes", "")
+
+        # Simple tuple comparison — works for MAJOR.MINOR.PATCH
+        def parse(v):
+            try:
+                return tuple(int(x) for x in str(v).strip().split('.'))
+            except Exception:
+                return (0, 0, 0)
+
+        update_available = parse(remote_version) > parse(APP_VERSION)
+
+        return jsonify({
+            "current_version": APP_VERSION,
+            "remote_version":  remote_version,
+            "update_available": update_available,
+            "notes": notes,
+        })
+    except Exception as e:
+        # Network failure, GitHub down, etc. — fail silently
+        return jsonify({
+            "current_version":  APP_VERSION,
+            "remote_version":   None,
+            "update_available": False,
+            "error":            str(e),
+        })
+
+# ════════════════════════════════════════════════════════════════════════════
 # STORE PROFILES
 # ════════════════════════════════════════════════════════════════════════════
 

@@ -12,6 +12,7 @@
     .nav-links {
         display: flex;
         gap: 15px;
+        align-items: center;
     }
     .nav-links a {
         color: #e0e0e0;
@@ -23,6 +24,58 @@
     }
     .nav-links a:hover { color: #ffffff; border-bottom-color: #e94560; }
     .nav-links a.active { color: #ffffff; border-bottom-color: #e94560; }
+
+    /* ── Update dot badge ── */
+    .update-dot-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        cursor: default;
+    }
+    .update-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #e94560;
+        display: none;
+        box-shadow: 0 0 6px rgba(233,69,96,0.7);
+        animation: pulse-dot 2s infinite;
+        flex-shrink: 0;
+    }
+    .update-dot.visible { display: block; }
+    @keyframes pulse-dot {
+        0%, 100% { box-shadow: 0 0 4px rgba(233,69,96,0.6); }
+        50%       { box-shadow: 0 0 10px rgba(233,69,96,1); }
+    }
+    /* Tooltip on hover */
+    .update-dot-wrap .update-tooltip {
+        display: none;
+        position: absolute;
+        bottom: calc(100% + 10px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1a1a2e;
+        border: 1px solid #e94560;
+        color: #e0e0e0;
+        font-size: 0.78em;
+        font-weight: normal;
+        padding: 8px 12px;
+        border-radius: 8px;
+        white-space: nowrap;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        z-index: 2000;
+        pointer-events: none;
+    }
+    .update-dot-wrap .update-tooltip::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 6px solid transparent;
+        border-top-color: #e94560;
+    }
+    .update-dot-wrap:hover .update-tooltip { display: block; }
 
     /* ── Store switcher floating button ── */
     .store-fab {
@@ -157,71 +210,46 @@
     .btn-profile-action:hover { border-color: #e94560; color: #e94560; }
     .btn-profile-action.activate { border-color: #28a745; color: #28a745; }
     .btn-profile-action.activate:hover { background: #28a745; color: #fff; }
-    .btn-profile-action.del { border-color: #dc3545; color: #dc3545; }
-    .btn-profile-action.del:hover { background: #dc3545; color: #fff; }
+    .btn-profile-action.del:hover { background: #e94560; color: #fff; }
 
-    /* Add new profile form */
-    .pm-divider {
-        border: none;
-        border-top: 1px solid #33334d;
-        margin: 16px 0;
-    }
-    .pm-section-title {
-        font-size: 0.82em;
-        font-weight: bold;
-        color: #b0b0b0;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        margin-bottom: 12px;
-    }
-    .pm-form-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-    }
+    .pm-divider { border-color: #33334d; margin: 16px 0; }
+    .pm-section-title { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 10px; }
+
+    .pm-form-grid { display: flex; flex-direction: column; gap: 8px; }
     .pm-input {
         width: 100%;
         padding: 9px 12px;
-        background: #2b2b40;
-        border: 1px solid #44446b;
-        border-radius: 7px;
+        background: #1a1a2e;
+        border: 1px solid #33334d;
+        border-radius: 6px;
         color: #e0e0e0;
-        font-size: 0.9em;
+        font-size: 0.88em;
         box-sizing: border-box;
         transition: border-color 0.2s;
     }
     .pm-input:focus { outline: none; border-color: #e94560; }
-    .pm-input::placeholder { color: #666; }
-
-    .pm-row { display: flex; gap: 10px; }
+    .pm-row { display: flex; gap: 8px; }
     .pm-row .pm-input { flex: 1; }
 
     .btn-add-profile {
-        width: 100%;
-        padding: 11px;
+        padding: 10px;
         background: #e94560;
         color: #fff;
         border: none;
-        border-radius: 8px;
-        font-size: 0.95em;
-        font-weight: bold;
+        border-radius: 6px;
         cursor: pointer;
+        font-size: 0.9em;
+        font-weight: bold;
+        transition: filter 0.2s;
         margin-top: 4px;
-        transition: filter 0.2s, transform 0.15s;
     }
-    .btn-add-profile:hover { filter: brightness(1.12); transform: translateY(-1px); }
+    .btn-add-profile:hover { filter: brightness(1.1); }
 
-    .pm-status {
-        font-size: 0.82em;
-        text-align: center;
-        margin-top: 8px;
-        min-height: 16px;
-        color: #b0b0b0;
-    }
-    .pm-status.ok   { color: #28a745; }
-    .pm-status.err  { color: #dc3545; }
+    .pm-status { font-size: 0.82em; min-height: 18px; margin-top: 2px; }
+    .pm-status.ok  { color: #28a745; }
+    .pm-status.err { color: #e94560; }
 
-    /* Edit inline form */
+    /* Edit form */
     .profile-edit-form {
         background: #1a1a2e;
         border: 1px solid #e94560;
@@ -260,19 +288,25 @@
 
 <nav>
     <div class="nav-links">
-        <a href="/" class="{% if active_page == 'dashboard' %}active{% endif %}">Dashboard</a>
-        <a href="/scanpack"  class="{% if active_page == 'scan'     %}active{% endif %}">Scan and Pack</a>
-        <a href="/markpaid"  class="{% if active_page == 'paid'     %}active{% endif %}">Mark as Paid</a>
-        <a href="/returned"  class="{% if active_page == 'returned' %}active{% endif %}">Mark as Returned</a>
-        <a href="/stock"     class="{% if active_page == 'stock'    %}active{% endif %}">Stock App</a>
-        <a href="/deduct"      class="{% if active_page == 'deduct'      %}active{% endif %}">QTY Deduction</a>
+        <a href="/"           class="{% if active_page == 'dashboard'  %}active{% endif %}">Dashboard</a>
+        <a href="/scanpack"   class="{% if active_page == 'scan'       %}active{% endif %}">Scan and Pack</a>
+        <a href="/markpaid"   class="{% if active_page == 'paid'       %}active{% endif %}">Mark as Paid</a>
+        <a href="/returned"   class="{% if active_page == 'returned'   %}active{% endif %}">Mark as Returned</a>
+        <a href="/stock"      class="{% if active_page == 'stock'      %}active{% endif %}">Stock App</a>
+        <a href="/deduct"     class="{% if active_page == 'deduct'     %}active{% endif %}">QTY Deduction</a>
         <a href="/accountant" class="{% if active_page == 'accountant' %}active{% endif %}">My Accountant</a>
+
+        <!-- Update dot — hidden until update check fires -->
+        <div class="update-dot-wrap" id="updateDotWrap" style="padding: 20px 6px;">
+            <div class="update-dot" id="updateDot"></div>
+            <div class="update-tooltip" id="updateTooltip">Update available</div>
+        </div>
     </div>
 </nav>
 
 <!-- Floating store switcher button -->
 <button class="store-fab" onclick="openProfilesModal()">
-     <span class="fab-store-name" id="fabStoreName">Loading...</span>
+    <span class="fab-store-name" id="fabStoreName">Loading...</span>
 </button>
 
 <!-- Profiles modal -->
@@ -280,7 +314,7 @@
     <div class="profiles-modal">
         <div class="pm-header">
             <h2>Store Profiles</h2>
-            <button class="pm-close" onclick="closeProfilesModal()">✕</button>
+            <button class="pm-close" onclick="closeProfilesModal()">&#x2715;</button>
         </div>
         <div class="pm-body">
             <div id="profilesList"></div>
@@ -288,15 +322,15 @@
             <hr class="pm-divider">
             <div class="pm-section-title">Add New Profile</div>
             <div class="pm-form-grid">
-                <input class="pm-input" id="newName"      placeholder="Profile name (e.g. Main Store)">
-                <input class="pm-input" id="newUrl"       placeholder="Store URL (e.g. your-store.myshopify.com)">
-                <input class="pm-input" id="newToken"     placeholder="Access Token" type="password">
+                <input class="pm-input" id="newName"    placeholder="Profile name (e.g. Main Store)">
+                <input class="pm-input" id="newUrl"     placeholder="Store URL (e.g. your-store.myshopify.com)">
+                <input class="pm-input" id="newToken"   placeholder="Access Token" type="password">
                 <div class="pm-row">
-                    <input class="pm-input" id="newVersion"   placeholder="API Version (e.g. 2024-07)">
+                    <input class="pm-input" id="newVersion" placeholder="API Version (e.g. 2024-07)">
                 </div>
                 <div class="pm-row">
-                    <input class="pm-input" id="newNs"    placeholder="Metafield Namespace">
-                    <input class="pm-input" id="newKey"   placeholder="Metafield Key">
+                    <input class="pm-input" id="newNs"  placeholder="Metafield Namespace">
+                    <input class="pm-input" id="newKey" placeholder="Metafield Key">
                 </div>
                 <button class="btn-add-profile" onclick="addProfile()">+ Add Profile</button>
                 <div class="pm-status" id="addStatus"></div>
@@ -310,9 +344,11 @@
     let profiles = [];
     let activeId = null;
 
+    // ── Profiles ────────────────────────────────────────────────────────────
+
     async function fetchProfiles() {
         try {
-            const res = await fetch('/api/profiles');
+            const res  = await fetch('/api/profiles');
             const data = await res.json();
             profiles = data.profiles || [];
             activeId = data.active;
@@ -357,13 +393,12 @@
     }
 
     window.activateProfile = async function(id) {
-        const res = await fetch(`/api/profiles/${id}/activate`, { method: 'POST' });
+        const res  = await fetch(`/api/profiles/${id}/activate`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
             activeId = id;
             renderProfiles();
             updateFab();
-            // Clear session storage so modules reload fresh for new store
             sessionStorage.clear();
             showAddStatus('Switched to ' + data.name, 'ok');
         }
@@ -371,7 +406,7 @@
 
     window.deleteProfile = async function(id) {
         if (!confirm('Delete this profile?')) return;
-        const res = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+        const res  = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
         const data = await res.json();
         if (data.success) { fetchProfiles(); }
     };
@@ -385,9 +420,9 @@
         const form = document.createElement('div');
         form.className = 'profile-edit-form';
         form.innerHTML = `
-            <input class="pm-input" id="edit-name-${id}"    value="${escHtml(p.name)}"       placeholder="Profile name">
-            <input class="pm-input" id="edit-url-${id}"     value="${escHtml(p.store_url)}"  placeholder="Store URL">
-            <input class="pm-input" id="edit-token-${id}"   placeholder="New token (leave blank to keep)" type="password">
+            <input class="pm-input" id="edit-name-${id}"  value="${escHtml(p.name)}"                placeholder="Profile name">
+            <input class="pm-input" id="edit-url-${id}"   value="${escHtml(p.store_url)}"           placeholder="Store URL">
+            <input class="pm-input" id="edit-token-${id}" placeholder="New token (leave blank to keep)" type="password">
             <div class="pm-row">
                 <input class="pm-input" id="edit-ver-${id}" value="${escHtml(p.api_version)}" placeholder="API Version">
             </div>
@@ -412,10 +447,10 @@
             metafield_namespace: document.getElementById(`edit-ns-${id}`).value.trim(),
             metafield_key:       document.getElementById(`edit-key-${id}`).value.trim(),
         };
-        const res = await fetch(`/api/profiles/${id}`, {
-            method: 'PUT',
+        const res  = await fetch(`/api/profiles/${id}`, {
+            method:  'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body:    JSON.stringify(body)
         });
         const data = await res.json();
         if (data.success) { fetchProfiles(); }
@@ -434,19 +469,16 @@
             return;
         }
 
-        const res = await fetch('/api/profiles', {
-            method: 'POST',
+        const res  = await fetch('/api/profiles', {
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, store_url: url, access_token: token, api_version: version, metafield_namespace: ns, metafield_key: key })
+            body:    JSON.stringify({ name, store_url: url, access_token: token, api_version: version, metafield_namespace: ns, metafield_key: key })
         });
         const data = await res.json();
         if (data.success) {
-            document.getElementById('newName').value    = '';
-            document.getElementById('newUrl').value     = '';
-            document.getElementById('newToken').value   = '';
-            document.getElementById('newVersion').value = '';
-            document.getElementById('newNs').value      = '';
-            document.getElementById('newKey').value     = '';
+            ['newName','newUrl','newToken','newVersion','newNs','newKey'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
             showAddStatus('Profile added!', 'ok');
             fetchProfiles();
         } else {
@@ -457,7 +489,7 @@
     function showAddStatus(msg, type) {
         const el = document.getElementById('addStatus');
         el.textContent = msg;
-        el.className = 'pm-status ' + type;
+        el.className   = 'pm-status ' + type;
         setTimeout(() => { el.textContent = ''; el.className = 'pm-status'; }, 3000);
     }
 
@@ -471,6 +503,7 @@
     };
 
     window.closeProfilesModal = function() {
+        document.getElementById('profilesOverlay').classList.remove('close');
         document.getElementById('profilesOverlay').classList.remove('open');
     };
 
@@ -478,7 +511,24 @@
         if (e.target === document.getElementById('profilesOverlay')) closeProfilesModal();
     };
 
-    // Load on page init
+    // ── Update check — runs once on every page load ─────────────────────────
+    async function checkForUpdate() {
+        try {
+            const res  = await fetch('/api/check_update');
+            const data = await res.json();
+            if (data.update_available) {
+                const dot     = document.getElementById('updateDot');
+                const tooltip = document.getElementById('updateTooltip');
+                dot.classList.add('visible');
+                tooltip.textContent = `Update available — v${data.remote_version}${data.notes ? ': ' + data.notes : ''}`;
+            }
+        } catch(e) {
+            // Silent fail — never block the UI over an update check
+        }
+    }
+
+    // Init
     fetchProfiles();
+    checkForUpdate();
 })();
 </script>
