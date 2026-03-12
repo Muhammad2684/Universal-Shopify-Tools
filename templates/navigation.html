@@ -25,57 +25,142 @@
     .nav-links a:hover { color: #ffffff; border-bottom-color: #e94560; }
     .nav-links a.active { color: #ffffff; border-bottom-color: #e94560; }
 
-    /* ── Update dot badge ── */
-    .update-dot-wrap {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        cursor: default;
-    }
+    /* ── Update dot ── */
     .update-dot {
         width: 9px;
         height: 9px;
         border-radius: 50%;
         background: #e94560;
         display: none;
+        flex-shrink: 0;
+        cursor: pointer;
         box-shadow: 0 0 6px rgba(233,69,96,0.7);
         animation: pulse-dot 2s infinite;
-        flex-shrink: 0;
+        margin-left: 4px;
     }
     .update-dot.visible { display: block; }
     @keyframes pulse-dot {
-        0%, 100% { box-shadow: 0 0 4px rgba(233,69,96,0.6); }
-        50%       { box-shadow: 0 0 10px rgba(233,69,96,1); }
+        0%, 100% { box-shadow: 0 0 4px rgba(233,69,96,0.5); }
+        50%       { box-shadow: 0 0 12px rgba(233,69,96,1); }
     }
-    /* Tooltip on hover */
-    .update-dot-wrap .update-tooltip {
+
+    /* ── Update modal overlay ── */
+    .update-overlay {
         display: none;
-        position: absolute;
-        bottom: calc(100% + 10px);
-        left: 50%;
-        transform: translateX(-50%);
-        background: #1a1a2e;
-        border: 1px solid #e94560;
-        color: #e0e0e0;
-        font-size: 0.78em;
-        font-weight: normal;
-        padding: 8px 12px;
-        border-radius: 8px;
-        white-space: nowrap;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.65);
+        backdrop-filter: blur(4px);
         z-index: 2000;
-        pointer-events: none;
+        align-items: center;
+        justify-content: center;
     }
-    .update-dot-wrap .update-tooltip::after {
-        content: '';
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        border: 6px solid transparent;
-        border-top-color: #e94560;
+    .update-overlay.open { display: flex; }
+
+    .update-modal {
+        background: #0f0f1d;
+        border: 1px solid #e94560;
+        border-radius: 14px;
+        width: 420px;
+        max-width: 95vw;
+        padding: 28px 28px 24px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+        animation: modal-in 0.2s ease;
     }
-    .update-dot-wrap:hover .update-tooltip { display: block; }
+    @keyframes modal-in {
+        from { transform: scale(0.95); opacity: 0; }
+        to   { transform: scale(1);    opacity: 1; }
+    }
+
+    .update-modal h3 {
+        margin: 0 0 6px;
+        color: #e94560;
+        font-size: 1.1em;
+    }
+    .update-version-line {
+        font-size: 0.8em;
+        color: #888;
+        margin-bottom: 14px;
+    }
+    .update-notes {
+        background: #1a1a2e;
+        border: 1px solid #33334d;
+        border-radius: 8px;
+        padding: 12px 14px;
+        font-size: 0.87em;
+        color: #c0c0c0;
+        margin-bottom: 20px;
+        min-height: 36px;
+    }
+
+    /* Progress bar */
+    .update-progress-wrap {
+        display: none;
+        margin-bottom: 16px;
+    }
+    .update-progress-wrap.visible { display: block; }
+    .update-progress-track {
+        background: #1a1a2e;
+        border: 1px solid #33334d;
+        border-radius: 8px;
+        height: 14px;
+        overflow: hidden;
+        margin-bottom: 6px;
+    }
+    .update-progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #e94560, #ff6b81);
+        border-radius: 8px;
+        width: 0%;
+        transition: width 0.3s ease;
+    }
+    .update-progress-text {
+        text-align: center;
+        font-size: 0.8em;
+        color: #888;
+    }
+
+    /* Status line */
+    .update-status-line {
+        font-size: 0.82em;
+        color: #888;
+        text-align: center;
+        min-height: 18px;
+        margin-bottom: 16px;
+    }
+    .update-status-line.ok  { color: #28a745; }
+    .update-status-line.err { color: #e94560; }
+
+    /* Buttons */
+    .update-btn-row {
+        display: flex;
+        gap: 10px;
+        justify-content: flex-end;
+    }
+    .btn-update-cancel {
+        padding: 9px 18px;
+        background: none;
+        color: #b0b0b0;
+        border: 1px solid #44446b;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.88em;
+        transition: all 0.15s;
+    }
+    .btn-update-cancel:hover { border-color: #e94560; color: #e94560; }
+    .btn-update-now {
+        padding: 9px 22px;
+        background: #e94560;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.88em;
+        font-weight: bold;
+        transition: filter 0.2s, opacity 0.2s;
+    }
+    .btn-update-now:hover   { filter: brightness(1.1); }
+    .btn-update-now:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 
     /* ── Store switcher floating button ── */
     .store-fab {
@@ -105,7 +190,7 @@
         white-space: nowrap;
     }
 
-    /* ── Modal overlay ── */
+    /* ── Profiles modal overlay ── */
     .profiles-overlay {
         display: none;
         position: fixed;
@@ -129,11 +214,6 @@
         box-shadow: 0 20px 60px rgba(0,0,0,0.7);
         animation: modal-in 0.25s ease;
     }
-    @keyframes modal-in {
-        from { transform: scale(0.95); opacity: 0; }
-        to   { transform: scale(1);    opacity: 1; }
-    }
-
     .profiles-modal::-webkit-scrollbar { width: 6px; }
     .profiles-modal::-webkit-scrollbar-thumb { background: #33334d; border-radius: 3px; }
 
@@ -146,142 +226,69 @@
     }
     .pm-header h2 { margin: 0; color: #e94560; font-size: 1.1em; }
     .pm-close {
-        background: none;
-        border: none;
-        color: #b0b0b0;
-        font-size: 1.4em;
-        cursor: pointer;
-        padding: 0 4px;
-        line-height: 1;
-        transition: color 0.2s;
+        background: none; border: none; color: #b0b0b0;
+        font-size: 1.4em; cursor: pointer; padding: 0 4px;
+        line-height: 1; transition: color 0.2s;
     }
     .pm-close:hover { color: #fff; }
-
     .pm-body { padding: 16px 20px; }
 
-    /* Profile cards */
     .profile-card {
-        background: #1a1a2e;
-        border: 1px solid #33334d;
-        border-radius: 10px;
-        padding: 14px 16px;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        transition: border-color 0.2s;
+        background: #1a1a2e; border: 1px solid #33334d;
+        border-radius: 10px; padding: 14px 16px; margin-bottom: 10px;
+        display: flex; align-items: center; gap: 12px; transition: border-color 0.2s;
     }
     .profile-card.active-profile { border-color: #e94560; }
     .profile-card-info { flex: 1; min-width: 0; }
-    .profile-card-name {
-        font-weight: bold;
-        color: #e0e0e0;
-        font-size: 0.95em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .profile-card-url {
-        font-size: 0.78em;
-        color: #b0b0b0;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .profile-card-badge {
-        font-size: 0.72em;
-        background: #e94560;
-        color: #fff;
-        padding: 2px 8px;
-        border-radius: 10px;
-        white-space: nowrap;
-    }
+    .profile-card-name { font-weight: bold; color: #e0e0e0; font-size: 0.95em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .profile-card-url  { font-size: 0.78em; color: #b0b0b0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .profile-card-badge { font-size: 0.72em; background: #e94560; color: #fff; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
     .profile-actions { display: flex; gap: 6px; flex-shrink: 0; }
     .btn-profile-action {
-        background: none;
-        border: 1px solid #44446b;
-        color: #b0b0b0;
-        border-radius: 5px;
-        padding: 4px 10px;
-        font-size: 0.78em;
-        cursor: pointer;
-        transition: all 0.15s;
+        background: none; border: 1px solid #44446b; color: #b0b0b0;
+        border-radius: 5px; padding: 4px 10px; font-size: 0.78em;
+        cursor: pointer; transition: all 0.15s;
     }
-    .btn-profile-action:hover { border-color: #e94560; color: #e94560; }
-    .btn-profile-action.activate { border-color: #28a745; color: #28a745; }
+    .btn-profile-action:hover          { border-color: #e94560; color: #e94560; }
+    .btn-profile-action.activate       { border-color: #28a745; color: #28a745; }
     .btn-profile-action.activate:hover { background: #28a745; color: #fff; }
-    .btn-profile-action.del:hover { background: #e94560; color: #fff; }
+    .btn-profile-action.del:hover      { background: #e94560; color: #fff; }
 
-    .pm-divider { border-color: #33334d; margin: 16px 0; }
+    .pm-divider      { border-color: #33334d; margin: 16px 0; }
     .pm-section-title { font-size: 0.8em; text-transform: uppercase; letter-spacing: 0.06em; color: #888; margin-bottom: 10px; }
-
-    .pm-form-grid { display: flex; flex-direction: column; gap: 8px; }
+    .pm-form-grid    { display: flex; flex-direction: column; gap: 8px; }
     .pm-input {
-        width: 100%;
-        padding: 9px 12px;
-        background: #1a1a2e;
-        border: 1px solid #33334d;
-        border-radius: 6px;
-        color: #e0e0e0;
-        font-size: 0.88em;
-        box-sizing: border-box;
-        transition: border-color 0.2s;
+        width: 100%; padding: 9px 12px; background: #1a1a2e;
+        border: 1px solid #33334d; border-radius: 6px; color: #e0e0e0;
+        font-size: 0.88em; box-sizing: border-box; transition: border-color 0.2s;
     }
     .pm-input:focus { outline: none; border-color: #e94560; }
     .pm-row { display: flex; gap: 8px; }
     .pm-row .pm-input { flex: 1; }
 
     .btn-add-profile {
-        padding: 10px;
-        background: #e94560;
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.9em;
-        font-weight: bold;
-        transition: filter 0.2s;
-        margin-top: 4px;
+        padding: 10px; background: #e94560; color: #fff; border: none;
+        border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: bold;
+        transition: filter 0.2s; margin-top: 4px;
     }
     .btn-add-profile:hover { filter: brightness(1.1); }
-
-    .pm-status { font-size: 0.82em; min-height: 18px; margin-top: 2px; }
+    .pm-status     { font-size: 0.82em; min-height: 18px; margin-top: 2px; }
     .pm-status.ok  { color: #28a745; }
     .pm-status.err { color: #e94560; }
 
-    /* Edit form */
     .profile-edit-form {
-        background: #1a1a2e;
-        border: 1px solid #e94560;
-        border-radius: 10px;
-        padding: 14px 16px;
-        margin-bottom: 10px;
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
+        background: #1a1a2e; border: 1px solid #e94560; border-radius: 10px;
+        padding: 14px 16px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px;
     }
     .edit-actions { display: flex; gap: 8px; margin-top: 4px; }
     .btn-save-edit {
-        padding: 7px 16px;
-        background: #28a745;
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.85em;
-        font-weight: bold;
-        transition: filter 0.2s;
+        padding: 7px 16px; background: #28a745; color: #fff; border: none;
+        border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: bold; transition: filter 0.2s;
     }
     .btn-save-edit:hover { filter: brightness(1.1); }
     .btn-cancel-edit {
-        padding: 7px 16px;
-        background: none;
-        color: #b0b0b0;
-        border: 1px solid #44446b;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 0.85em;
-        transition: all 0.15s;
+        padding: 7px 16px; background: none; color: #b0b0b0; border: 1px solid #44446b;
+        border-radius: 6px; cursor: pointer; font-size: 0.85em; transition: all 0.15s;
     }
     .btn-cancel-edit:hover { border-color: #e94560; color: #e94560; }
 </style>
@@ -296,15 +303,36 @@
         <a href="/deduct"     class="{% if active_page == 'deduct'     %}active{% endif %}">QTY Deduction</a>
         <a href="/accountant" class="{% if active_page == 'accountant' %}active{% endif %}">My Accountant</a>
 
-        <!-- Update dot — hidden until update check fires -->
-        <div class="update-dot-wrap" id="updateDotWrap" style="padding: 20px 6px;">
-            <div class="update-dot" id="updateDot"></div>
-            <div class="update-tooltip" id="updateTooltip">Update available</div>
-        </div>
+        <!-- Update dot — hidden until update available -->
+        <div id="updateDot" class="update-dot" title="Update available — click to install"
+             onclick="openUpdateModal()"></div>
     </div>
 </nav>
 
-<!-- Floating store switcher button -->
+<!-- Update modal -->
+<div class="update-overlay" id="updateOverlay">
+    <div class="update-modal">
+        <h3>Update Available</h3>
+        <div class="update-version-line" id="updateVersionLine"></div>
+        <div class="update-notes" id="updateNotes"></div>
+
+        <div class="update-progress-wrap" id="updateProgressWrap">
+            <div class="update-progress-track">
+                <div class="update-progress-fill" id="updateProgressFill"></div>
+            </div>
+            <div class="update-progress-text" id="updateProgressText">Downloading...</div>
+        </div>
+
+        <div class="update-status-line" id="updateStatusLine"></div>
+
+        <div class="update-btn-row">
+            <button class="btn-update-cancel" id="updateCancelBtn" onclick="closeUpdateModal()">Later</button>
+            <button class="btn-update-now"    id="updateNowBtn"    onclick="startUpdate()">Update Now</button>
+        </div>
+    </div>
+</div>
+
+<!-- Floating store switcher -->
 <button class="store-fab" onclick="openProfilesModal()">
     <span class="fab-store-name" id="fabStoreName">Loading...</span>
 </button>
@@ -318,7 +346,6 @@
         </div>
         <div class="pm-body">
             <div id="profilesList"></div>
-
             <hr class="pm-divider">
             <div class="pm-section-title">Add New Profile</div>
             <div class="pm-form-grid">
@@ -340,11 +367,135 @@
 </div>
 
 <script>
-(function() {
-    let profiles = [];
-    let activeId = null;
+(function () {
+    // ── Update state ────────────────────────────────────────────────────────
+    let _downloadUrl    = '';
+    let _remoteVersion  = '';
+    let _pollInterval   = null;
+
+    function openUpdateModal() {
+        document.getElementById('updateOverlay').classList.add('open');
+    }
+    window.closeUpdateModal = function () {
+        if (_pollInterval) return;   // don't close mid-download
+        document.getElementById('updateOverlay').classList.remove('open');
+    };
+
+    function setStatus(msg, cls) {
+        const el = document.getElementById('updateStatusLine');
+        el.textContent = msg;
+        el.className   = 'update-status-line' + (cls ? ' ' + cls : '');
+    }
+
+    window.startUpdate = async function () {
+        if (!_downloadUrl) {
+            setStatus('No download URL — check version.json on GitHub.', 'err');
+            return;
+        }
+
+        // Lock buttons
+        document.getElementById('updateNowBtn').disabled    = true;
+        document.getElementById('updateCancelBtn').disabled = true;
+
+        // Show progress bar
+        document.getElementById('updateProgressWrap').classList.add('visible');
+        setStatus('Starting download...');
+
+        // Kick off the download in Flask
+        try {
+            const res  = await fetch('/api/do_update', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ download_url: _downloadUrl })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                setStatus(data.error || 'Update failed.', 'err');
+                document.getElementById('updateNowBtn').disabled    = false;
+                document.getElementById('updateCancelBtn').disabled = false;
+                return;
+            }
+        } catch (e) {
+            setStatus('Could not reach the update server.', 'err');
+            document.getElementById('updateNowBtn').disabled    = false;
+            document.getElementById('updateCancelBtn').disabled = false;
+            return;
+        }
+
+        // Poll progress
+        _pollInterval = setInterval(async () => {
+            try {
+                const res  = await fetch('/api/update_progress');
+                const data = await res.json();
+
+                const fill = document.getElementById('updateProgressFill');
+                const text = document.getElementById('updateProgressText');
+
+                if (data.status === 'downloading') {
+                    fill.style.width  = data.percent + '%';
+                    text.textContent  = `Downloading... ${data.percent}%`;
+
+                } else if (data.status === 'swapping') {
+                    fill.style.width  = '100%';
+                    text.textContent  = 'Installing...';
+                    setStatus('Replacing files — app will restart in a moment...', 'ok');
+
+                } else if (data.status === 'done') {
+                    clearInterval(_pollInterval);
+                    _pollInterval = null;
+                    fill.style.width  = '100%';
+                    text.textContent  = 'Done!';
+                    setStatus('Restarting...', 'ok');
+
+                } else if (data.status === 'error') {
+                    clearInterval(_pollInterval);
+                    _pollInterval = null;
+                    setStatus('Error: ' + data.error, 'err');
+                    document.getElementById('updateNowBtn').disabled    = false;
+                    document.getElementById('updateCancelBtn').disabled = false;
+                }
+            } catch (e) {
+                // App process killed — this is expected at restart
+                clearInterval(_pollInterval);
+                _pollInterval = null;
+            }
+        }, 600);
+    };
+
+    // ── Check for update on page load ───────────────────────────────────────
+    async function checkForUpdate() {
+        try {
+            const res  = await fetch('/api/check_update');
+            const data = await res.json();
+
+            if (data.update_available) {
+                _downloadUrl   = data.download_url   || '';
+                _remoteVersion = data.remote_version || '';
+
+                // Show dot
+                document.getElementById('updateDot').classList.add('visible');
+
+                // Pre-fill modal
+                document.getElementById('updateVersionLine').textContent =
+                    `Current: v${data.current_version}   →   New: v${_remoteVersion}`;
+                document.getElementById('updateNotes').textContent =
+                    data.notes || 'No release notes.';
+
+                // If no download URL, disable the button and explain
+                if (!_downloadUrl) {
+                    document.getElementById('updateNowBtn').disabled = true;
+                    setStatus('No download URL in version.json — update manually.', 'err');
+                }
+            }
+        } catch (e) {
+            // Silent — never block the UI
+        }
+    }
 
     // ── Profiles ────────────────────────────────────────────────────────────
+    let profiles = [];
+    let activeId = null;
 
     async function fetchProfiles() {
         try {
@@ -354,7 +505,7 @@
             activeId = data.active;
             renderProfiles();
             updateFab();
-        } catch(e) {
+        } catch (e) {
             document.getElementById('fabStoreName').textContent = 'No store';
         }
     }
@@ -374,9 +525,9 @@
         profiles.forEach(p => {
             const isActive = p.id === activeId;
             const card = document.createElement('div');
-            card.className = 'profile-card' + (isActive ? ' active-profile' : '');
+            card.className  = 'profile-card' + (isActive ? ' active-profile' : '');
             card.dataset.id = p.id;
-            card.innerHTML = `
+            card.innerHTML  = `
                 <div class="profile-card-info">
                     <div class="profile-card-name">${escHtml(p.name)}</div>
                     <div class="profile-card-url">${escHtml(p.store_url)}</div>
@@ -392,7 +543,7 @@
         });
     }
 
-    window.activateProfile = async function(id) {
+    window.activateProfile = async function (id) {
         const res  = await fetch(`/api/profiles/${id}/activate`, { method: 'POST' });
         const data = await res.json();
         if (data.success) {
@@ -404,19 +555,17 @@
         }
     };
 
-    window.deleteProfile = async function(id) {
+    window.deleteProfile = async function (id) {
         if (!confirm('Delete this profile?')) return;
         const res  = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
         const data = await res.json();
-        if (data.success) { fetchProfiles(); }
+        if (data.success) fetchProfiles();
     };
 
-    window.editProfile = function(id) {
+    window.editProfile = function (id) {
         const p = profiles.find(x => x.id === id);
         if (!p) return;
-        const container = document.getElementById('profilesList');
-        const card = container.querySelector(`[data-id="${id}"]`);
-
+        const card = document.getElementById('profilesList').querySelector(`[data-id="${id}"]`);
         const form = document.createElement('div');
         form.className = 'profile-edit-form';
         form.innerHTML = `
@@ -438,7 +587,7 @@
         card.replaceWith(form);
     };
 
-    window.saveEdit = async function(id) {
+    window.saveEdit = async function (id) {
         const body = {
             name:                document.getElementById(`edit-name-${id}`).value.trim(),
             store_url:           document.getElementById(`edit-url-${id}`).value.trim(),
@@ -448,15 +597,13 @@
             metafield_key:       document.getElementById(`edit-key-${id}`).value.trim(),
         };
         const res  = await fetch(`/api/profiles/${id}`, {
-            method:  'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify(body)
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
         });
         const data = await res.json();
-        if (data.success) { fetchProfiles(); }
+        if (data.success) fetchProfiles();
     };
 
-    window.addProfile = async function() {
+    window.addProfile = async function () {
         const name    = document.getElementById('newName').value.trim();
         const url     = document.getElementById('newUrl').value.trim();
         const token   = document.getElementById('newToken').value.trim();
@@ -464,15 +611,11 @@
         const ns      = document.getElementById('newNs').value.trim();
         const key     = document.getElementById('newKey').value.trim();
 
-        if (!name || !url || !token) {
-            showAddStatus('Name, URL, and Token are required.', 'err');
-            return;
-        }
+        if (!name || !url || !token) { showAddStatus('Name, URL, and Token are required.', 'err'); return; }
 
         const res  = await fetch('/api/profiles', {
-            method:  'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ name, store_url: url, access_token: token, api_version: version, metafield_namespace: ns, metafield_key: key })
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, store_url: url, access_token: token, api_version: version, metafield_namespace: ns, metafield_key: key })
         });
         const data = await res.json();
         if (data.success) {
@@ -497,37 +640,18 @@
         return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
-    window.openProfilesModal = function() {
+    window.openProfilesModal = function () {
         document.getElementById('profilesOverlay').classList.add('open');
         fetchProfiles();
     };
-
-    window.closeProfilesModal = function() {
-        document.getElementById('profilesOverlay').classList.remove('close');
+    window.closeProfilesModal = function () {
         document.getElementById('profilesOverlay').classList.remove('open');
     };
-
-    window.handleOverlayClick = function(e) {
+    window.handleOverlayClick = function (e) {
         if (e.target === document.getElementById('profilesOverlay')) closeProfilesModal();
     };
 
-    // ── Update check — runs once on every page load ─────────────────────────
-    async function checkForUpdate() {
-        try {
-            const res  = await fetch('/api/check_update');
-            const data = await res.json();
-            if (data.update_available) {
-                const dot     = document.getElementById('updateDot');
-                const tooltip = document.getElementById('updateTooltip');
-                dot.classList.add('visible');
-                tooltip.textContent = `Update available — v${data.remote_version}${data.notes ? ': ' + data.notes : ''}`;
-            }
-        } catch(e) {
-            // Silent fail — never block the UI over an update check
-        }
-    }
-
-    // Init
+    // ── Init ────────────────────────────────────────────────────────────────
     fetchProfiles();
     checkForUpdate();
 })();

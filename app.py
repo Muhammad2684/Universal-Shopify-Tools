@@ -93,42 +93,45 @@ def credentials_ok():
     return bool(SHOPIFY_STORE_URL() and SHOPIFY_ACCESS_TOKEN())
 
 # ════════════════════════════════════════════════════════════════════════════
-# VERSION / UPDATE CHECK
+# VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-# The current version of this build — bump this string whenever you release.
 APP_VERSION = "1.0.0"
-
-# Raw URL of version.json in your GitHub repo.
-# Replace with your actual repo URL once you create the file there.
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
+
+# version.json on GitHub must include a "download" key pointing to the .exe:
+# {
+#   "version":  "1.1.0",
+#   "notes":    "Bug fixes",
+#   "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.1.0/UniversalSHTools.exe"
+# }
+
+# ── Shared progress state (written by background thread, read by poll route) ─
+_update_state = {"status": "idle", "percent": 0, "error": ""}
+
 
 @app.route('/api/check_update', methods=['GET'])
 def check_update():
     try:
         resp = requests.get(VERSION_URL, timeout=5)
         resp.raise_for_status()
-        remote = resp.json()
-        remote_version = remote.get("version", "0.0.0")
-        notes          = remote.get("notes", "")
+        remote          = resp.json()
+        remote_version  = remote.get("version", "0.0.0")
+        notes           = remote.get("notes", "")
+        download_url    = remote.get("download", "")
 
-        # Simple tuple comparison — works for MAJOR.MINOR.PATCH
         def parse(v):
-            try:
-                return tuple(int(x) for x in str(v).strip().split('.'))
-            except Exception:
-                return (0, 0, 0)
-
-        update_available = parse(remote_version) > parse(APP_VERSION)
+            try:    return tuple(int(x) for x in str(v).strip().split('.'))
+            except: return (0, 0, 0)
 
         return jsonify({
-            "current_version": APP_VERSION,
-            "remote_version":  remote_version,
-            "update_available": update_available,
-            "notes": notes,
+            "current_version":  APP_VERSION,
+            "remote_version":   remote_version,
+            "update_available": parse(remote_version) > parse(APP_VERSION),
+            "notes":            notes,
+            "download_url":     download_url,
         })
     except Exception as e:
-        # Network failure, GitHub down, etc. — fail silently
         return jsonify({
             "current_version":  APP_VERSION,
             "remote_version":   None,
@@ -136,6 +139,90 @@ def check_update():
             "error":            str(e),
         })
 
+
+@app.route('/api/update_progress', methods=['GET'])
+def update_progress():
+    return jsonify(_update_state)
+
+
+@app.route('/api/do_update', methods=['POST'])
+def do_update():
+    global _update_state
+
+    body         = request.get_json(silent=True) or {}
+    download_url = body.get("download_url", "").strip()
+
+    if not download_url:
+        return jsonify({"success": False, "error": "No download URL provided"}), 400
+
+    if not getattr(sys, 'frozen', False):
+        return jsonify({
+            "success": False,
+            "error":   "Auto-update only works in the packaged .exe. In dev mode, update manually."
+        }), 400
+
+    _update_state = {"status": "downloading", "percent": 0, "error": ""}
+
+    current_exe = sys.executable
+    exe_dir     = os.path.dirname(current_exe)
+    new_exe     = os.path.join(exe_dir, "_update_new.exe")
+    bat_path    = os.path.join(exe_dir, "_updater.bat")
+
+    def _run():
+        global _update_state
+        try:
+            # ── 1. Download with progress ─────────────────────────────────
+            with requests.get(download_url, stream=True, timeout=120) as r:
+                r.raise_for_status()
+                total     = int(r.headers.get('Content-Length', 0))
+                received  = 0
+                with open(new_exe, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=65536):
+                        if chunk:
+                            f.write(chunk)
+                            received += len(chunk)
+                            if total:
+                                _update_state["percent"] = int(received / total * 100)
+
+            _update_state["status"]  = "swapping"
+            _update_state["percent"] = 100
+
+            # ── 2. Write the swap .bat ────────────────────────────────────
+            bat = (
+                "@echo off\n"
+                ":: Wait for old process to exit\n"
+                "ping -n 4 127.0.0.1 > nul\n"
+                f'del /f /q "{current_exe}"\n'
+                f'move /y "{new_exe}" "{current_exe}"\n'
+                f'start "" "{current_exe}"\n'
+                'del /f /q "%~f0"\n'
+            )
+            with open(bat_path, 'w') as f:
+                f.write(bat)
+
+            # ── 3. Launch bat detached ────────────────────────────────────
+            import subprocess, time
+            subprocess.Popen(
+                ['cmd.exe', '/c', bat_path],
+                creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
+                close_fds=True
+            )
+
+            _update_state["status"] = "done"
+            time.sleep(1.5)
+
+            # ── 4. Kill this process — bat takes over ─────────────────────
+            os.kill(os.getpid(), 9)
+
+        except Exception as e:
+            _update_state["status"] = "error"
+            _update_state["error"]  = str(e)
+            print(f"[UPDATER] Failed: {e}")
+
+    import threading
+    threading.Thread(target=_run, daemon=True).start()
+
+    return jsonify({"success": True})
 # ════════════════════════════════════════════════════════════════════════════
 # STORE PROFILES
 # ════════════════════════════════════════════════════════════════════════════
