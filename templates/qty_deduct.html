@@ -7,59 +7,209 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style5.css') }}">
     <style>
         /* ── Search slide-down bar ── */
-        .search-bar-wrap {
-            display: none;
-            margin-top: 8px;
-        }
-        .search-bar-wrap.open {
-            display: block;
-            animation: slideDown 0.15s ease;
-        }
+        .search-bar-wrap { display: none; margin-top: 8px; }
+        .search-bar-wrap.open { display: block; animation: slideDown 0.15s ease; }
         @keyframes slideDown {
             from { opacity: 0; transform: translateY(-4px); }
             to   { opacity: 1; transform: translateY(0); }
         }
         .search-bar-wrap input[type="text"] {
-            width: 100%;
-            padding: 9px 12px;
-            border: 1px solid var(--input-border);
-            border-radius: 6px;
-            background: var(--input-bg);
-            color: var(--text-light);
-            font-size: 0.95em;
-            box-sizing: border-box;
-            margin-bottom: 0;
+            width: 100%; padding: 9px 12px;
+            border: 1px solid var(--input-border); border-radius: 6px;
+            background: var(--input-bg); color: var(--text-light);
+            font-size: 0.95em; box-sizing: border-box; margin-bottom: 0;
         }
-        .search-bar-wrap input[type="text"]:focus {
-            outline: none;
-            border-color: var(--accent-color);
-        }
+        .search-bar-wrap input[type="text"]:focus { outline: none; border-color: var(--accent-color); }
         #skuList li.search-hidden { display: none !important; }
+        #searchCount { font-size: 0.8em; color: var(--text-dark); margin-left: 6px; }
 
-        #searchCount {
-            font-size: 0.8em;
-            color: var(--text-dark);
-            margin-left: 6px;
-        }
-
-        /* Search icon button — matches btn-confirm / btn-clear sizing */
         .btn-icon-search {
-            padding: 11px 14px;
-            background-color: var(--accent-color);
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 1em;
-            line-height: 1;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
+            padding: 11px 14px; background-color: var(--accent-color); color: #fff;
+            border: none; border-radius: 8px; cursor: pointer; font-size: 1em; line-height: 1;
+            display: inline-flex; align-items: center; justify-content: center;
             transition: filter 0.2s, transform 0.15s;
         }
         .btn-icon-search:hover { filter: brightness(1.1); transform: translateY(-1px); }
         .btn-icon-search:active { transform: translateY(0); }
         .btn-icon-search.active { background-color: var(--input-border); }
+
+        /* ── Browse Products button ── */
+        .btn-browse {
+            width: 100%; padding: 11px 16px;
+            background: #e94560; color: #fff;
+            border: none; border-radius: 8px; cursor: pointer;
+            font-size: 0.92em; font-weight: 600;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            transition: filter 0.2s, transform 0.15s;
+        }
+        .btn-browse:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        /* ── Product search modal overlay ── */
+        .prod-overlay {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+            z-index: 2000; align-items: center; justify-content: center;
+        }
+        .prod-overlay.open { display: flex; }
+
+        .prod-modal {
+            background: #0f0f1d; border: 1px solid #e94560;
+            border-radius: 16px; width: 680px; max-width: 95vw;
+            height: 560px; max-height: 85vh; display: flex; flex-direction: column;
+            box-shadow: 0 24px 80px rgba(0,0,0,0.9);
+            animation: modalIn 0.2s ease;
+        }
+        @keyframes modalIn {
+            from { transform: scale(0.96); opacity: 0; }
+            to   { transform: scale(1);    opacity: 1; }
+        }
+
+        /* Header */
+        .prod-modal-header {
+            padding: 20px 22px 16px;
+            border-bottom: 1px solid #1e1e35;
+            flex-shrink: 0;
+        }
+        .prod-modal-title-row {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 14px;
+        }
+        .prod-modal-title-row h3 { margin: 0; color: #e94560; font-size: 1.05em; }
+        .prod-modal-close {
+            background: none; border: none; color: #555; cursor: pointer;
+            font-size: 1.3em; line-height: 1; padding: 2px 6px;
+            transition: color 0.15s;
+        }
+        .prod-modal-close:hover { color: #e94560; }
+
+        .prod-search-wrap { position: relative; }
+        .prod-search-icon {
+            position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+            color: #555; pointer-events: none;
+        }
+        .prod-search-input {
+            width: 100%; padding: 11px 14px 11px 38px;
+            background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 10px;
+            color: #e0e0e0; font-size: 0.95em; box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        .prod-search-input:focus { outline: none; border-color: #e94560; }
+        .prod-search-input::placeholder { color: #444; }
+
+        /* Results */
+        .prod-results {
+            flex: 1; overflow-y: auto; padding: 6px 0;
+        }
+        .prod-results::-webkit-scrollbar { width: 4px; }
+        .prod-results::-webkit-scrollbar-thumb { background: #2a2a45; border-radius: 2px; }
+
+        /* Each product row */
+        .prod-result-item {
+            display: flex; align-items: center; gap: 14px;
+            padding: 12px 22px;
+            border-bottom: 1px solid #13131f;
+            transition: background 0.12s; cursor: pointer;
+            user-select: none;
+        }
+        .prod-result-item:hover { background: #13131f; }
+        .prod-result-item.selected { background: rgba(233,69,96,0.07); border-bottom-color: rgba(233,69,96,0.1); }
+        .prod-result-item:last-child { border-bottom: none; }
+
+        /* Checkbox */
+        .prod-checkbox-wrap {
+            flex-shrink: 0; width: 20px; height: 20px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .prod-checkbox {
+            width: 17px; height: 17px;
+            accent-color: #e94560; cursor: pointer;
+            flex-shrink: 0;
+        }
+
+        /* Thumbnail */
+        .prod-thumb {
+            width: 48px; height: 48px; border-radius: 8px;
+            object-fit: cover; flex-shrink: 0;
+            background: #1a1a2e; border: 1px solid #2a2a45;
+        }
+        .prod-thumb-placeholder {
+            width: 48px; height: 48px; border-radius: 8px; flex-shrink: 0;
+            background: #1a1a2e; border: 1px solid #2a2a45;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .prod-thumb-placeholder svg { opacity: 0.2; }
+
+        /* Info block */
+        .prod-info { flex: 1; min-width: 0; }
+        .prod-name {
+            font-size: 0.93em; font-weight: 600; color: #e0e0e0;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            margin-bottom: 3px;
+        }
+        .prod-meta { display: flex; align-items: center; gap: 10px; }
+        .prod-sku-badge {
+            font-size: 0.73em; color: #888;
+            background: #1a1a2e; border: 1px solid #2a2a45;
+            padding: 2px 7px; border-radius: 4px;
+            font-family: monospace; letter-spacing: 0.02em;
+        }
+        .prod-stock-badge {
+            font-size: 0.73em; padding: 2px 8px; border-radius: 4px; font-weight: 600;
+        }
+        .prod-stock-badge.ok  { background: rgba(34,197,94,0.12); color: #22c55e; }
+        .prod-stock-badge.low { background: rgba(249,115,22,0.12); color: #f97316; }
+        .prod-stock-badge.out { background: rgba(233,69,96,0.12);  color: #e94560; }
+
+        /* Qty input */
+        .prod-qty-wrap {
+            flex-shrink: 0; display: flex; flex-direction: column;
+            align-items: center; gap: 3px;
+        }
+        .prod-qty-label { font-size: 0.68em; color: #555; text-transform: uppercase; letter-spacing: 0.05em; }
+        .prod-qty-input {
+            width: 68px; padding: 7px 8px; text-align: center;
+            background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 7px;
+            color: #e0e0e0; font-size: 0.95em; font-weight: 600;
+            transition: border-color 0.2s;
+        }
+        .prod-qty-input:focus { outline: none; border-color: #e94560; }
+
+        /* Empty / loading states */
+        .prod-state {
+            padding: 60px 20px; text-align: center;
+            color: #444; font-size: 0.9em;
+            display: flex; flex-direction: column; align-items: center; gap: 10px;
+        }
+        .prod-state svg { opacity: 0.2; }
+
+        /* Footer */
+        .prod-modal-footer {
+            padding: 14px 22px;
+            border-top: 1px solid #1e1e35;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-shrink: 0; background: #0c0c18; border-radius: 0 0 16px 16px;
+        }
+        .prod-selected-count {
+            font-size: 0.82em; color: #666;
+        }
+        .prod-selected-count span { color: #e94560; font-weight: 700; }
+        .prod-footer-btns { display: flex; gap: 10px; }
+
+        .btn-prod-cancel {
+            padding: 9px 20px; background: none; color: #888;
+            border: 1px solid #2a2a45; border-radius: 8px;
+            cursor: pointer; font-size: 0.88em; transition: all 0.15s;
+        }
+        .btn-prod-cancel:hover { border-color: #e94560; color: #e94560; }
+
+        .btn-prod-add {
+            padding: 9px 24px; background: #e94560; color: #fff;
+            border: none; border-radius: 8px; cursor: pointer;
+            font-size: 0.88em; font-weight: 700;
+            transition: filter 0.2s, opacity 0.2s;
+        }
+        .btn-prod-add:hover   { filter: brightness(1.12); }
+        .btn-prod-add:disabled { opacity: 0.35; cursor: not-allowed; filter: none; }
     </style>
 </head>
 <body>
@@ -79,6 +229,7 @@
                         <input type="file" id="csvFile" accept=".csv" style="display:none">
                     </div>
                 </div>
+
                 <div class="qd-card">
                     <h3 class="qd-card-title">Manual Entry</h3>
                     <div class="manual-row">
@@ -87,7 +238,14 @@
                         <button onclick="addManualEntry()" class="btn-add">+ Add</button>
                     </div>
                     <div id="manualStatus" class="inline-status"></div>
+                    <div style="margin-top: 10px;">
+                        <button class="btn-browse" onclick="openProductModal()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            Browse Products
+                        </button>
+                    </div>
                 </div>
+
                 <div class="qd-card qd-summary">
                     <div class="summary-stat">
                         <span class="stat-num" id="totalSkus">0</span>
@@ -119,15 +277,12 @@
                             <span id="searchCount" style="display:none;"></span>
                         </span>
                     </div>
-
-                    <!-- Search bar (hidden by default) -->
                     <div class="search-bar-wrap" id="searchBarWrap">
                         <input type="text" id="searchInput"
                                placeholder="Search SKUs..."
                                oninput="filterSkuList(this.value)"
                                onkeydown="if(event.key==='Escape') toggleSearch()">
                     </div>
-
                     <div class="list-cols" id="listCols" style="display:none">
                         <span>#</span><span>SKU</span><span>Qty</span><span>Actions</span>
                     </div>
@@ -145,9 +300,192 @@
 
         </div>
     </main>
+
+    <!-- ── Product Search Modal ── -->
+    <div class="prod-overlay" id="prodOverlay" onclick="handleProdOverlayClick(event)">
+        <div class="prod-modal">
+
+            <div class="prod-modal-header">
+                <div class="prod-modal-title-row">
+                    <h3>Browse Products</h3>
+                    <button class="prod-modal-close" onclick="closeProdModal()">&#x2715;</button>
+                </div>
+                <div class="prod-search-wrap">
+                    <svg class="prod-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input class="prod-search-input" id="prodSearchInput"
+                           placeholder="Search by product name or SKU..."
+                           oninput="onProdSearch(this.value)"
+                           autocomplete="off">
+                </div>
+            </div>
+
+            <div class="prod-results" id="prodResults">
+                <div class="prod-state">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    Type to search products
+                </div>
+            </div>
+
+            <div class="prod-modal-footer">
+                <div class="prod-selected-count">
+                    <span id="prodSelectedCountNum">0</span> product(s) selected
+                </div>
+                <div class="prod-footer-btns">
+                    <button class="btn-prod-cancel" onclick="closeProdModal()">Cancel</button>
+                    <button class="btn-prod-add" id="prodAddBtn" onclick="addSelectedProducts()" disabled>Add to Queue</button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
     <footer class="app-footer">
         {% include 'navigation.html' %}
     </footer>
     <script src="{{ url_for('static', filename='js/main5.js') }}"></script>
+    <script>
+    // ── Product Search Modal ─────────────────────────────────────────────────
+    var _prodSearchTimer = null;
+    var _prodSelected    = {};   // { sku: qty }
+
+    window.openProductModal = function() {
+        _prodSelected = {};
+        document.getElementById('prodSearchInput').value = '';
+        document.getElementById('prodResults').innerHTML =
+            '<div class="prod-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Type to search products</div>';
+        document.getElementById('prodSelectedCountNum').textContent = '0';
+        document.getElementById('prodAddBtn').disabled = true;
+        document.getElementById('prodOverlay').classList.add('open');
+        setTimeout(function() { document.getElementById('prodSearchInput').focus(); }, 80);
+    };
+
+    window.closeProdModal = function() {
+        document.getElementById('prodOverlay').classList.remove('open');
+    };
+
+    window.handleProdOverlayClick = function(e) {
+        if (e.target === document.getElementById('prodOverlay')) closeProdModal();
+    };
+
+    function onProdSearch(val) {
+        clearTimeout(_prodSearchTimer);
+        if (val.trim().length < 2) {
+            document.getElementById('prodResults').innerHTML =
+                '<div class="prod-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>Type at least 2 characters</div>';
+            return;
+        }
+        document.getElementById('prodResults').innerHTML =
+            '<div class="prod-state"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>Searching...</div>';
+        _prodSearchTimer = setTimeout(function() { doSearch(val.trim()); }, 350);
+    }
+
+    async function doSearch(q) {
+        try {
+            var res  = await fetch('/api/search_products?q=' + encodeURIComponent(q));
+            var data = await res.json();
+            if (!data.success) {
+                document.getElementById('prodResults').innerHTML =
+                    '<div class="prod-state">Error: ' + escProd(data.error) + '</div>';
+                return;
+            }
+            renderProdResults(data.results);
+        } catch(e) {
+            document.getElementById('prodResults').innerHTML =
+                '<div class="prod-state">Network error — check your connection</div>';
+        }
+    }
+
+    function renderProdResults(results) {
+        var container = document.getElementById('prodResults');
+        if (!results.length) {
+            container.innerHTML = '<div class="prod-state"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="7"/><path d="M15 15l6 6"/><path d="M9 6v6m-3-3h6"/></svg>No products found</div>';
+            return;
+        }
+        container.innerHTML = '';
+        results.forEach(function(r) {
+            var isSelected = !!_prodSelected[r.sku];
+            var stockClass = r.stock <= 0 ? 'out' : (r.stock < 5 ? 'low' : 'ok');
+            var stockLabel = r.stock <= 0 ? 'Out of stock' : (r.stock < 5 ? 'Low: ' + r.stock : 'In stock: ' + r.stock);
+
+            var row = document.createElement('div');
+            row.className   = 'prod-result-item' + (isSelected ? ' selected' : '');
+            row.dataset.sku = r.sku;
+
+            var thumbHtml = r.image
+                ? '<img class="prod-thumb" src="' + r.image + '" loading="lazy">'
+                : '<div class="prod-thumb-placeholder"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>';
+
+            row.innerHTML =
+                '<div class="prod-checkbox-wrap"><input type="checkbox" class="prod-checkbox" ' + (isSelected ? 'checked' : '') + ' onchange="toggleProdSelect(\'' + escProd(r.sku) + '\', this)" onclick="event.stopPropagation()"></div>' +
+                thumbHtml +
+                '<div class="prod-info">' +
+                    '<div class="prod-name">' + escProd(r.name) + '</div>' +
+                    '<div class="prod-meta">' +
+                        '<span class="prod-sku-badge">' + escProd(r.sku) + '</span>' +
+                        '<span class="prod-stock-badge ' + stockClass + '">' + stockLabel + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<div class="prod-qty-wrap">' +
+                    '<span class="prod-qty-label">Qty</span>' +
+                    '<input type="number" class="prod-qty-input" min="1" value="' + (isSelected ? _prodSelected[r.sku] : 1) + '" ' +
+                        'id="qty-' + escProd(r.sku) + '" ' +
+                        'onclick="event.stopPropagation()" ' +
+                        'onchange="updateProdQty(\'' + escProd(r.sku) + '\', this.value)">' +
+                '</div>';
+
+            row.addEventListener('click', function(e) {
+                if (e.target.tagName === 'INPUT') return;
+                var cb = row.querySelector('.prod-checkbox');
+                cb.checked = !cb.checked;
+                toggleProdSelect(r.sku, cb);
+            });
+            container.appendChild(row);
+        });
+    }
+
+    window.toggleProdSelect = function(sku, cb) {
+        var qtyInput = document.getElementById('qty-' + sku);
+        var qty      = parseInt(qtyInput ? qtyInput.value : 1) || 1;
+        var row      = cb.closest('.prod-result-item');
+        if (cb.checked) {
+            _prodSelected[sku] = qty;
+            if (row) row.classList.add('selected');
+        } else {
+            delete _prodSelected[sku];
+            if (row) row.classList.remove('selected');
+        }
+        updateProdFooter();
+    };
+
+    window.updateProdQty = function(sku, val) {
+        if (_prodSelected[sku] !== undefined) {
+            _prodSelected[sku] = Math.max(1, parseInt(val) || 1);
+        }
+    };
+
+    function updateProdFooter() {
+        var count = Object.keys(_prodSelected).length;
+        document.getElementById('prodSelectedCountNum').textContent = count;
+        document.getElementById('prodAddBtn').disabled = count === 0;
+    }
+
+    window.addSelectedProducts = function() {
+        var entries = [];
+        Object.keys(_prodSelected).forEach(function(sku) {
+            entries.push({ sku: sku, qty: _prodSelected[sku] });
+        });
+        if (!entries.length) return;
+        addItems(entries);
+        closeProdModal();
+        var ms = document.getElementById('manualStatus');
+        ms.textContent = 'Added ' + entries.length + ' product(s) from browse';
+        ms.style.color = '#28a745';
+        setTimeout(function() { ms.textContent = ''; }, 3000);
+    };
+
+    function escProd(s) {
+        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    }
+    </script>
 </body>
 </html>

@@ -9,7 +9,8 @@
 <div class="product-grid">
     {% for product in products %}
         <div class="product-card">
-            <img src="{{ product.image_url if product.image_url else 'https://via.placeholder.com/300/1a1a2e/e94560?text=No+Image' }}" alt="{{ product.title }}">
+            <img src="{{ product.image_url if product.image_url else 'https://via.placeholder.com/300/1a1a2e/e94560?text=No+Image' }}"
+                 alt="{{ product.title }}">
             <div class="product-card-body">
                 <h5>{{ product.title }}</h5>
                 <div class="needed-qty">Needs: {{ product.needed_qty }}</div>

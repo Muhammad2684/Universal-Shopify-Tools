@@ -373,9 +373,9 @@
     let _remoteVersion  = '';
     let _pollInterval   = null;
 
-    function openUpdateModal() {
+    window.openUpdateModal = function() {
         document.getElementById('updateOverlay').classList.add('open');
-    }
+    };
     window.closeUpdateModal = function () {
         if (_pollInterval) return;   // don't close mid-download
         document.getElementById('updateOverlay').classList.remove('open');
@@ -464,35 +464,66 @@
     };
 
     // ── Check for update on page load ───────────────────────────────────────
-    async function checkForUpdate() {
-        try {
-            const res  = await fetch('/api/check_update');
-            const data = await res.json();
-
-            if (data.update_available) {
-                _downloadUrl   = data.download_url   || '';
-                _remoteVersion = data.remote_version || '';
-
-                // Show dot
-                document.getElementById('updateDot').classList.add('visible');
-
-                // Pre-fill modal
-                document.getElementById('updateVersionLine').textContent =
-                    `Current: v${data.current_version}   →   New: v${_remoteVersion}`;
-                document.getElementById('updateNotes').textContent =
-                    data.notes || 'No release notes.';
-
-                // If no download URL, disable the button and explain
-                if (!_downloadUrl) {
-                    document.getElementById('updateNowBtn').disabled = true;
-                    setStatus('No download URL in version.json — update manually.', 'err');
-                }
+async function checkForUpdate() {
+    // Only check once per session
+    if (sessionStorage.getItem('update_checked')) {
+        // Restore dot state if update was found earlier
+        if (sessionStorage.getItem('update_available') === 'true') {
+            _downloadUrl   = sessionStorage.getItem('update_download_url') || '';
+            _remoteVersion = sessionStorage.getItem('update_remote_version') || '';
+            document.getElementById('updateDot').classList.add('visible');
+            document.getElementById('updateVersionLine').textContent =
+                'Current: v' + (sessionStorage.getItem('update_current_version') || '') +
+                '   →   New: v' + _remoteVersion;
+            document.getElementById('updateNotes').textContent =
+                sessionStorage.getItem('update_notes') || 'No release notes.';
+            if (!_downloadUrl) {
+                document.getElementById('updateNowBtn').disabled = true;
+                setStatus('No download URL in version.json — update manually.', 'err');
             }
-        } catch (e) {
-            // Silent — never block the UI
         }
+        return;
     }
 
+    // Mark as checked for this session
+    sessionStorage.setItem('update_checked', 'true');
+
+    try {
+        const res  = await fetch('/api/check_update');
+        const data = await res.json();
+
+        if (data.update_available) {
+            _downloadUrl   = data.download_url   || '';
+            _remoteVersion = data.remote_version || '';
+
+            // Store in session so other pages can restore state
+            sessionStorage.setItem('update_available',       'true');
+            sessionStorage.setItem('update_download_url',    _downloadUrl);
+            sessionStorage.setItem('update_remote_version',  _remoteVersion);
+            sessionStorage.setItem('update_current_version', data.current_version || '');
+            sessionStorage.setItem('update_notes',           data.notes || '');
+
+            document.getElementById('updateDot').classList.add('visible');
+
+            document.getElementById('updateVersionLine').textContent =
+                'Current: v' + data.current_version + '   →   New: v' + _remoteVersion;
+            document.getElementById('updateNotes').textContent =
+                data.notes || 'No release notes.';
+
+            if (!_downloadUrl) {
+                document.getElementById('updateNowBtn').disabled = true;
+                setStatus('No download URL in version.json — update manually.', 'err');
+            }
+
+            // Auto-open only on first check (first page load of the session)
+            openUpdateModal();
+        } else {
+            sessionStorage.setItem('update_available', 'false');
+        }
+    } catch (e) {
+        // Silent fail
+    }
+}
     // ── Profiles ────────────────────────────────────────────────────────────
     let profiles = [];
     let activeId = null;

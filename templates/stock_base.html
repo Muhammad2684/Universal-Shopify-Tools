@@ -5,22 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ page_title }} - Stock App</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style4.css') }}">
+    <style>
+        .stock-nav-manage {
+            margin-left: auto;
+            color: var(--text-dark);
+            text-decoration: none;
+            font-weight: bold;
+            padding: 8px 18px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-secondary);
+            transition: all 0.25s ease;
+            font-size: 0.9em;
+        }
+        .stock-nav-manage:hover {
+            color: #fff;
+            border-color: var(--accent-color);
+            background-color: var(--item-bg);
+        }
+        .stock-nav-manage.active {
+            color: #fff;
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+    </style>
 </head>
 <body>
-
     <header class="app-header">
         <h1>Stock App</h1>
     </header>
 
     <main class="app-main">
-        <nav class="stock-nav">
-            <a href="/stock"          class="{% if active_stock == 'urgent'   %}active{% endif %}">Urgent</a>
-            <a href="/stock/simple"   class="{% if active_stock == 'simple'   %}active{% endif %}">Simple</a>
-            <a href="/stock/2-button" class="{% if active_stock == '2-button' %}active{% endif %}">2 Button</a>
-            <a href="/stock/7-button" class="{% if active_stock == '7-button' %}active{% endif %}">7 Button</a>
-            <a href="/stock/quilt"    class="{% if active_stock == 'quilt'    %}active{% endif %}">Quilt</a>
-            <a href="/stock/bednet"   class="{% if active_stock == 'bednet'   %}active{% endif %}">Bed Net</a>
-            <a href="/stock/7pcs"     class="{% if active_stock == '7pcs'     %}active{% endif %}">7 Pcs</a>
+        <nav class="stock-nav" id="stockNav">
+            <a href="/stock" class="{% if active_stock == 'urgent' %}active{% endif %}">Urgent</a>
+            <!-- Dynamic categories injected by JS -->
+            <a href="/stock/manage" class="stock-nav-manage {% if active_stock == 'manage' %}active{% endif %}">
+                + Manage
+            </a>
         </nav>
 
         {% block content %}{% endblock %}
@@ -30,5 +51,24 @@
         {% include 'navigation.html' %}
     </footer>
 
+    <script>
+    // Inject dynamic category links into nav
+    (async function() {
+        var activeStock = "{{ active_stock }}";
+        try {
+            var res  = await fetch('/api/stock_categories');
+            var cats = await res.json();
+            var nav  = document.getElementById('stockNav');
+            var manageLink = nav.querySelector('.stock-nav-manage');
+            cats.forEach(function(cat) {
+                var a = document.createElement('a');
+                a.href      = '/stock/' + cat.slug;
+                a.textContent = cat.title;
+                if (activeStock === cat.slug) a.classList.add('active');
+                nav.insertBefore(a, manageLink);
+            });
+        } catch(e) {}
+    })();
+    </script>
 </body>
 </html>

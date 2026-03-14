@@ -15,11 +15,9 @@ if getattr(sys, 'frozen', False):
 else:
     app = Flask(__name__)
 
-# Always write data to AppData — works for both dev and installed
 BASE_DIR = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'UniversalSHTools')
 os.makedirs(BASE_DIR, exist_ok=True)
 
-# ── Active credentials (driven entirely by profiles) ─────────────────────────
 active_creds = {
     "SHOPIFY_STORE_URL":    "",
     "SHOPIFY_ACCESS_TOKEN": "",
@@ -48,7 +46,6 @@ def _clear_creds():
     active_creds["METAFIELD_NAMESPACE"]  = ""
     active_creds["METAFIELD_KEY"]        = ""
 
-# ── Auto-load the active profile on startup ───────────────────────────────────
 PROFILES_FILE = os.path.join(BASE_DIR, 'profiles.json')
 
 def boot_active_profile():
@@ -73,7 +70,6 @@ def boot_active_profile():
 
 print(f"[STARTUP] BASE_DIR: {BASE_DIR}")
 
-# ── Stock App Config ─────────────────────────────────────────────────────────
 STOCK_CATEGORIES = {
     "simple":   {"tag": "HJMQS",  "title": "Simple"},
     "2-button": {"tag": "HJMQ2B", "title": "2 Button"},
@@ -96,17 +92,9 @@ def credentials_ok():
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.1.2"
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
 
-# version.json on GitHub must include a "download" key pointing to the .exe:
-# {
-#   "version":  "1.1.0",
-#   "notes":    "Bug fixes",
-#   "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.1.0/UniversalSHTools.exe"
-# }
-
-# ── Shared progress state (written by background thread, read by poll route) ─
 _update_state = {"status": "idle", "percent": 0, "error": ""}
 
 
@@ -115,10 +103,10 @@ def check_update():
     try:
         resp = requests.get(VERSION_URL, timeout=5)
         resp.raise_for_status()
-        remote          = resp.json()
-        remote_version  = remote.get("version", "0.0.0")
-        notes           = remote.get("notes", "")
-        download_url    = remote.get("download", "")
+        remote         = resp.json()
+        remote_version = remote.get("version", "0.0.0")
+        notes          = remote.get("notes", "")
+        download_url   = remote.get("download", "")
 
         def parse(v):
             try:    return tuple(int(x) for x in str(v).strip().split('.'))
@@ -166,16 +154,16 @@ def do_update():
     current_exe = sys.executable
     exe_dir     = os.path.dirname(current_exe)
     new_exe     = os.path.join(exe_dir, "_update_new.exe")
-    bat_path    = os.path.join(exe_dir, "_updater.bat")
 
     def _run():
         global _update_state
+        import subprocess, time
         try:
             # ── 1. Download with progress ─────────────────────────────────
             with requests.get(download_url, stream=True, timeout=120) as r:
                 r.raise_for_status()
-                total     = int(r.headers.get('Content-Length', 0))
-                received  = 0
+                total    = int(r.headers.get('Content-Length', 0))
+                received = 0
                 with open(new_exe, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=65536):
                         if chunk:
@@ -187,42 +175,47 @@ def do_update():
             _update_state["status"]  = "swapping"
             _update_state["percent"] = 100
 
-            # ── 2. Write the swap .bat ────────────────────────────────────
-            bat = (
-                "@echo off\n"
-                ":: Wait for old process to exit\n"
-                "ping -n 4 127.0.0.1 > nul\n"
-                f'del /f /q "{current_exe}"\n'
-                f'move /y "{new_exe}" "{current_exe}"\n'
-                f'start "" "{current_exe}"\n'
-                'del /f /q "%~f0"\n'
-            )
-            with open(bat_path, 'w') as f:
-                f.write(bat)
+            # ── 2. Find bundled swap.bat next to the exe ──────────────────
+            bat_path = os.path.join(exe_dir, 'swap.bat')
+            if not os.path.exists(bat_path):
+                _update_state["status"] = "error"
+                _update_state["error"]  = "swap.bat not found next to exe"
+                return
 
-            # ── 3. Launch bat detached ────────────────────────────────────
-            import subprocess, time
+            # Write _MEI path so bat can wait for it to be cleaned up
+            mei_folder = getattr(sys, '_MEIPASS', '')
+            mei_file = os.path.join(exe_dir, '_mei_path.txt')
+            with open(mei_file, 'w') as f:
+                f.write(mei_folder)
+
+            # ── 3. Launch swap.bat detached ───────────────────────────────
             subprocess.Popen(
                 ['cmd.exe', '/c', bat_path],
-                creationflags=subprocess.CREATE_NO_WINDOW | subprocess.DETACHED_PROCESS,
                 close_fds=True
             )
 
-            _update_state["status"] = "done"
-            time.sleep(1.5)
+            # Give bat time to fully start before we exit
+            time.sleep(3.0)
 
-            # ── 4. Kill this process — bat takes over ─────────────────────
-            os.kill(os.getpid(), 9)
+            _update_state["status"] = "done"
+            time.sleep(0.5)
+
+            # ── 4. Close webview gracefully so PyInstaller cleans up _MEI ─
+            import webview
+            try:
+                for w in webview.windows:
+                    w.destroy()
+            except Exception:
+                os._exit(0)
 
         except Exception as e:
             _update_state["status"] = "error"
             _update_state["error"]  = str(e)
             print(f"[UPDATER] Failed: {e}")
 
-    import threading
     threading.Thread(target=_run, daemon=True).start()
-
     return jsonify({"success": True})
+
 # ════════════════════════════════════════════════════════════════════════════
 # STORE PROFILES
 # ════════════════════════════════════════════════════════════════════════════
@@ -439,12 +432,12 @@ def dashboard():
 @app.route('/api/dashboard', methods=['GET'])
 def api_dashboard():
     result = {
-        'packed_today':        0,
-        'returned_today':      0,
-        'earnings_today':      0,
+        'packed_today':         0,
+        'returned_today':       0,
+        'earnings_today':       0,
         'earnings_entry_count': 0,
-        'urgent_count':        0,
-        'urgent_items':        [],
+        'urgent_count':         0,
+        'urgent_items':         [],
     }
 
     today_str = datetime.date.today().strftime('%d-%m-%Y')
@@ -746,10 +739,11 @@ def run_graphql_query(query):
 def process_product_edges(edges):
     processed = []
     for edge in (edges or []):
-        node = edge['node']
+        node        = edge['node']
         current_qty = node['variants']['edges'][0]['node']['inventoryQuantity'] if node['variants']['edges'] else 0
-        threshold = int(node['metafield']['value']) if node.get('metafield') else 0
+        threshold   = int(node['metafield']['value']) if node.get('metafield') else 0
         processed.append({
+            "product_id":  node['id'],
             "title":       node['title'],
             "image_url":   node['featuredImage']['url'] if node.get('featuredImage') else None,
             "current_qty": current_qty,
@@ -757,9 +751,98 @@ def process_product_edges(edges):
         })
     return processed
 
+# ── Dynamic categories stored in AppData ────────────────────────────────────
+
+CATEGORIES_FILE = os.path.join(BASE_DIR, 'categories.json')
+
+DEFAULT_CATEGORIES = [
+    {"slug": "simple",   "title": "Simple",   "tag": "HJMQS"},
+    {"slug": "2-button", "title": "2 Button",  "tag": "HJMQ2B"},
+    {"slug": "7-button", "title": "7 Button",  "tag": "HJMQ7B"},
+    {"slug": "quilt",    "title": "Quilt",     "tag": "HJMQQ"},
+    {"slug": "bednet",   "title": "Bed Net",   "tag": "HJMQBN"},
+    {"slug": "7pcs",     "title": "7 Pcs",     "tag": "HJMQ7P"},
+]
+
+def load_categories():
+    if os.path.exists(CATEGORIES_FILE):
+        try:
+            with open(CATEGORIES_FILE, 'r') as f:
+                data = json.load(f)
+                if data:
+                    return data
+        except Exception:
+            pass
+    save_categories(DEFAULT_CATEGORIES)
+    return DEFAULT_CATEGORIES
+
+def save_categories(cats):
+    with open(CATEGORIES_FILE, 'w') as f:
+        json.dump(cats, f, indent=2)
+
+def get_stock_categories_dict():
+    return {c['slug']: {'tag': c['tag'], 'title': c['title']} for c in load_categories()}
+
+# ── Category CRUD routes ─────────────────────────────────────────────────────
+
+@app.route('/api/stock_categories', methods=['GET'])
+def api_get_categories():
+    return jsonify(load_categories())
+
+@app.route('/api/stock_categories', methods=['POST'])
+def api_add_category():
+    import re
+    body  = request.get_json(silent=True) or {}
+    title = body.get('title', '').strip()
+    tag   = body.get('tag',   '').strip()
+    slug  = body.get('slug',  '').strip()
+
+    if not title or not tag or not slug:
+        return jsonify({'success': False, 'error': 'title, tag, and slug are all required'}), 400
+
+    slug = re.sub(r'[^a-z0-9\-]', '', slug.lower())
+    if not slug:
+        return jsonify({'success': False, 'error': 'Invalid slug'}), 400
+
+    cats = load_categories()
+    if any(c['slug'] == slug for c in cats):
+        return jsonify({'success': False, 'error': f'Slug "{slug}" already exists'}), 400
+
+    cats.append({'slug': slug, 'title': title, 'tag': tag})
+    save_categories(cats)
+    return jsonify({'success': True})
+
+@app.route('/api/stock_categories/<slug>', methods=['PUT'])
+def api_update_category(slug):
+    body = request.get_json(silent=True) or {}
+    cats = load_categories()
+    cat  = next((c for c in cats if c['slug'] == slug), None)
+    if not cat:
+        return jsonify({'success': False, 'error': 'Category not found'}), 404
+    cat['title'] = body.get('title', cat['title']).strip()
+    cat['tag']   = body.get('tag',   cat['tag']).strip()
+    save_categories(cats)
+    return jsonify({'success': True})
+
+@app.route('/api/stock_categories/<slug>', methods=['DELETE'])
+def api_delete_category(slug):
+    cats = load_categories()
+    new  = [c for c in cats if c['slug'] != slug]
+    if len(new) == len(cats):
+        return jsonify({'success': False, 'error': 'Category not found'}), 404
+    save_categories(new)
+    return jsonify({'success': True})
+
+# ── Stock pages ──────────────────────────────────────────────────────────────
+
+@app.route('/stock/manage')
+def manage_categories():
+    return render_template('manage_categories.html', active_page='stock', active_stock='manage')
+
 @app.route('/stock')
 def show_urgent():
-    all_tags = [cat["tag"] for cat in STOCK_CATEGORIES.values()]
+    stock_cats       = get_stock_categories_dict()
+    all_tags         = [cat["tag"] for cat in get_stock_categories_dict().values()]
     tag_query_string = " OR ".join([f"tag:'{tag}'" for tag in all_tags])
     query = f"""
     {{
@@ -796,9 +879,14 @@ def show_urgent():
 
 @app.route('/stock/<category_slug>')
 def show_category(category_slug):
-    if category_slug not in STOCK_CATEGORIES:
+    if category_slug == 'manage':
+        return manage_categories()
+
+    stock_cats = get_stock_categories_dict()
+    if category_slug not in stock_cats:
         abort(404)
-    category = STOCK_CATEGORIES[category_slug]
+
+    category = stock_cats[category_slug]
     tag = category["tag"]
     ns  = METAFIELD_NAMESPACE()
     key = METAFIELD_KEY()
@@ -824,7 +912,7 @@ def show_category(category_slug):
     products_to_display = []
     if data and 'errors' not in data:
         product_edges = data.get('data', {}).get('products', {}).get('edges', [])
-        all_products = process_product_edges(product_edges)
+        all_products  = process_product_edges(product_edges)
         for product in all_products:
             needed_qty = product['threshold'] - product['current_qty']
             if needed_qty > 0:
@@ -833,6 +921,178 @@ def show_category(category_slug):
     sorted_products = sorted(products_to_display, key=lambda p: p['needed_qty'], reverse=True)
     return render_template('category_page.html', products=sorted_products, page_title=category["title"],
                            active_page='stock', active_stock=category_slug)
+
+# ── Threshold edit ────────────────────────────────────────────────────────────
+
+@app.route('/api/update_threshold', methods=['POST'])
+def update_threshold():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body       = request.get_json(silent=True) or {}
+    product_id = body.get('product_id', '').strip()
+    new_value  = body.get('value')
+
+    if not product_id or new_value is None:
+        return jsonify({'success': False, 'error': 'product_id and value required'}), 400
+
+    try:
+        new_value = int(new_value)
+        if new_value < 0:
+            return jsonify({'success': False, 'error': 'Threshold must be 0 or more'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Value must be a number'}), 400
+
+    ns  = METAFIELD_NAMESPACE()
+    key = METAFIELD_KEY()
+
+    mutation = """
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { key namespace value }
+        userErrors  { field message }
+      }
+    }
+    """
+    variables = {
+        "metafields": [{
+            "ownerId":   product_id,
+            "namespace": ns,
+            "key":       key,
+            "value":     str(new_value),
+            "type":      "number_integer"
+        }]
+    }
+
+    try:
+        resp = requests.post(
+            get_graphql_url(),
+            headers=get_headers(),
+            json={"query": mutation, "variables": variables}
+        )
+        resp.raise_for_status()
+        data   = resp.json()
+        errors = data.get('data', {}).get('metafieldsSet', {}).get('userErrors', [])
+        if errors:
+            return jsonify({'success': False, 'error': errors[0]['message']}), 400
+        return jsonify({'success': True, 'new_value': new_value})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+        
+# ── Category product management routes ──────────────────────────────────────
+
+@app.route('/api/category_products/<slug>', methods=['GET'])
+def get_category_products(slug):
+    """Fetch all products currently in a category with their threshold values."""
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    cats = load_categories()
+    cat  = next((c for c in cats if c['slug'] == slug), None)
+    if not cat:
+        return jsonify({'success': False, 'error': 'Category not found'}), 404
+
+    tag = cat['tag']
+    ns  = METAFIELD_NAMESPACE()
+    key = METAFIELD_KEY()
+    gql = f"""
+    {{
+      products(first: 250, query: "tag:'{tag}'") {{
+        edges {{
+          node {{
+            id
+            title
+            featuredImage {{ url }}
+            variants(first: 1) {{
+              edges {{ node {{ sku inventoryQuantity }} }}
+            }}
+            metafield(namespace: "{ns}", key: "{key}") {{
+              value
+            }}
+          }}
+        }}
+      }}
+    }}
+    """
+    try:
+        data    = run_graphql_query(gql)
+        results = []
+        for edge in data.get('data', {}).get('products', {}).get('edges', []):
+            node      = edge['node']
+            variant   = node['variants']['edges'][0]['node'] if node['variants']['edges'] else {}
+            threshold = int(node['metafield']['value']) if node.get('metafield') else 0
+            results.append({
+                'id':        node['id'],
+                'title':     node['title'],
+                'image':     node['featuredImage']['url'] if node.get('featuredImage') else None,
+                'sku':       variant.get('sku', ''),
+                'stock':     variant.get('inventoryQuantity', 0),
+                'threshold': threshold,
+            })
+        return jsonify({'success': True, 'results': results, 'tag': tag})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/category_product', methods=['POST'])
+def add_product_to_category():
+    """Add a category tag to a product."""
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body       = request.get_json(silent=True) or {}
+    product_id = body.get('product_id', '').strip()
+    tag        = body.get('tag', '').strip()
+
+    if not product_id or not tag:
+        return jsonify({'success': False, 'error': 'product_id and tag required'}), 400
+
+    headers   = get_headers()
+    prod_url  = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/products/{product_id}.json"
+    try:
+        resp          = requests.get(prod_url, headers=headers, params={"fields": "id,tags"})
+        resp.raise_for_status()
+        product       = resp.json().get('product', {})
+        existing_tags = product.get('tags', '')
+        tag_list      = [t.strip() for t in existing_tags.split(',') if t.strip()]
+        if tag not in tag_list:
+            tag_list.append(tag)
+        updated = requests.put(prod_url, headers=headers,
+                               json={"product": {"id": product_id, "tags": ', '.join(tag_list)}})
+        updated.raise_for_status()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/category_product', methods=['DELETE'])
+def remove_product_from_category():
+    """Remove a category tag from a product."""
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body       = request.get_json(silent=True) or {}
+    product_id = body.get('product_id', '').strip()
+    tag        = body.get('tag', '').strip()
+
+    if not product_id or not tag:
+        return jsonify({'success': False, 'error': 'product_id and tag required'}), 400
+
+    headers  = get_headers()
+    prod_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/products/{product_id}.json"
+    try:
+        resp          = requests.get(prod_url, headers=headers, params={"fields": "id,tags"})
+        resp.raise_for_status()
+        product       = resp.json().get('product', {})
+        existing_tags = product.get('tags', '')
+        tag_list      = [t.strip() for t in existing_tags.split(',') if t.strip() and t.strip() != tag]
+        updated = requests.put(prod_url, headers=headers,
+                               json={"product": {"id": product_id, "tags": ', '.join(tag_list)}})
+        updated.raise_for_status()
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 
 # ════════════════════════════════════════════════════════════════════════════
 # QTY DEDUCTION
@@ -884,6 +1144,72 @@ def deduct_qty():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+# ── Replace your existing /api/search_products route with this version ───────
+# Added numeric_id to results so category product management can use it
+
+@app.route('/api/search_products', methods=['GET'])
+def search_products():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+    q = request.args.get('q', '').strip()
+    if not q:
+        return jsonify({'success': False, 'error': 'Query required'}), 400
+
+    headers     = get_headers()
+    graphql_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/graphql.json"
+    safe_q      = q.replace('"', '').replace('\\', '')
+    gql = """
+    {
+      products(first: 30, query: "title:*""" + safe_q + """* OR sku:""" + safe_q + """") {
+        edges {
+          node {
+            id
+            title
+            featuredImage { url }
+            variants(first: 20) {
+              edges {
+                node {
+                  sku
+                  title
+                  inventoryQuantity
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+    try:
+        resp = requests.post(graphql_url, headers=headers, json={'query': gql})
+        resp.raise_for_status()
+        data    = resp.json()
+        results = []
+        for edge in data.get('data', {}).get('products', {}).get('edges', []):
+            node       = edge['node']
+            title      = node['title']
+            img        = node['featuredImage']['url'] if node.get('featuredImage') else None
+            # Extract numeric ID from GID e.g. "gid://shopify/Product/123" -> "123"
+            numeric_id = node['id'].split('/')[-1]
+            for v in node['variants']['edges']:
+                vnode         = v['node']
+                sku           = vnode.get('sku', '').strip()
+                if not sku:
+                    continue
+                variant_title = vnode.get('title', '')
+                display       = title if variant_title in ('Default Title', '') else f"{title} — {variant_title}"
+                results.append({
+                    'sku':        sku,
+                    'name':       display,
+                    'image':      img,
+                    'stock':      vnode.get('inventoryQuantity', 0),
+                    'product_id': numeric_id,   # <-- added
+                    'gid':        node['id'],    # <-- added (for threshold updates)
+                })
+        return jsonify({'success': True, 'results': results})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 # ════════════════════════════════════════════════════════════════════════════
 # MY ACCOUNTANT
 # ════════════════════════════════════════════════════════════════════════════

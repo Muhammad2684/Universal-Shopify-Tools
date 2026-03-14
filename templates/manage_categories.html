@@ -1,0 +1,560 @@
+{% extends "stock_base.html" %}
+
+{% block content %}
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+
+.manage-layout { display: flex; gap: 28px; align-items: flex-start; }
+.manage-left   { flex: 1; min-width: 0; }
+
+.manage-section-title {
+    color: var(--accent-color); font-size: 0.82em; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin: 0 0 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color);
+}
+
+.cat-list { display: flex; flex-direction: column; gap: 8px; }
+.cat-row {
+    background: var(--bg-secondary); border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 12px 16px;
+    display: flex; align-items: center; gap: 12px; transition: border-color 0.2s;
+}
+.cat-row:hover { border-color: var(--input-border); }
+.cat-info      { flex: 1; min-width: 0; }
+.cat-title     { font-weight: 600; color: var(--text-light); font-size: 0.95em; }
+.cat-meta      { font-size: 0.78em; color: var(--text-dark); margin-top: 2px; display: flex; gap: 10px; }
+.cat-tag-badge { background: var(--item-bg); border: 1px solid var(--border-color); padding: 1px 7px; border-radius: 4px; font-family: monospace; }
+.cat-actions   { display: flex; gap: 6px; flex-shrink: 0; }
+.btn-cat {
+    background: none; border: 1px solid var(--border-color); color: var(--text-dark);
+    border-radius: 5px; padding: 4px 10px; font-size: 0.78em; cursor: pointer; transition: all 0.15s;
+}
+.btn-cat:hover          { border-color: var(--accent-color); color: var(--accent-color); transform: none; filter: none; }
+.btn-cat.del:hover      { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+.btn-cat.products:hover { border-color: #22c55e; color: #22c55e; }
+
+.cat-edit-form {
+    background: var(--bg-secondary); border: 1px solid var(--accent-color);
+    border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.cat-edit-row  { display: flex; gap: 8px; }
+.cat-input {
+    flex: 1; padding: 8px 10px; background: var(--input-bg); border: 1px solid var(--border-color);
+    border-radius: 6px; color: var(--text-light); font-size: 0.88em; transition: border-color 0.2s;
+}
+.cat-input:focus { outline: none; border-color: var(--accent-color); }
+.cat-input-label { font-size: 0.75em; color: var(--text-dark); }
+.cat-edit-actions { display: flex; gap: 8px; margin-top: 2px; }
+.btn-save-cat {
+    padding: 7px 16px; background: var(--accent-color); color: #fff;
+    border: none; border-radius: 6px; cursor: pointer; font-size: 0.85em; font-weight: 700; transition: filter 0.15s;
+}
+.btn-save-cat:hover { filter: brightness(1.1); }
+.btn-cancel-cat {
+    padding: 7px 14px; background: none; color: var(--text-dark);
+    border: 1px solid var(--border-color); border-radius: 6px; cursor: pointer; font-size: 0.85em; transition: all 0.15s;
+}
+.btn-cancel-cat:hover { border-color: var(--accent-color); color: var(--accent-color); }
+.cat-status { font-size: 0.78em; min-height: 14px; margin-top: 4px; }
+.cat-status.ok  { color: #28a745; }
+.cat-status.err { color: var(--accent-color); }
+
+.manage-right { width: 280px; flex-shrink: 0; }
+.add-card { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px; }
+.add-card-title {
+    color: var(--accent-color); font-size: 0.82em; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em;
+    margin: 0 0 14px; padding-bottom: 6px; border-bottom: 1px solid var(--border-color);
+}
+.add-form   { display: flex; flex-direction: column; gap: 10px; }
+.field-group { display: flex; flex-direction: column; gap: 3px; }
+.field-label { font-size: 0.78em; color: var(--text-dark); }
+.field-hint  { font-size: 0.72em; color: #666; }
+.btn-add-cat {
+    padding: 10px; background: var(--accent-color); color: #fff;
+    border: none; border-radius: 6px; cursor: pointer; font-size: 0.9em; font-weight: 700;
+    transition: filter 0.2s; margin-top: 4px;
+}
+.btn-add-cat:hover { filter: brightness(1.1); }
+.add-status { font-size: 0.8em; min-height: 16px; margin-top: 2px; }
+.add-status.ok  { color: #28a745; }
+.add-status.err { color: var(--accent-color); }
+.empty-cats {
+    padding: 28px 20px; text-align: center; color: var(--text-dark);
+    font-style: italic; font-size: 0.9em;
+    background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 10px;
+}
+
+/* ══════════════════════ PRODUCT MODAL ══════════════════════ */
+.pm-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+    z-index: 2000; align-items: center; justify-content: center;
+}
+.pm-overlay.open { display: flex; }
+.pm-modal {
+    background: #0f0f1d; border: 1px solid #e94560; border-radius: 16px;
+    width: 700px; max-width: 95vw; height: 600px; max-height: 88vh;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.9); animation: pmIn 0.2s ease;
+}
+@keyframes pmIn { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.pm-header { padding: 18px 20px 0; border-bottom: 1px solid #1e1e35; flex-shrink: 0; }
+.pm-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.pm-title-row h3 { margin: 0; color: #e94560; font-size: 1.05em; }
+.pm-cat-tag { font-size: 0.75em; background: #1a1a2e; border: 1px solid #33334d; padding: 2px 10px; border-radius: 4px; color: #888; font-family: monospace; }
+.pm-close { background: none; border: none; color: #555; cursor: pointer; font-size: 1.3em; line-height: 1; padding: 2px 6px; transition: color 0.15s; }
+.pm-close:hover { color: #e94560; }
+
+.pm-tabs { display: flex; }
+.pm-tab { padding: 10px 20px; background: none; border: none; color: #666; font-size: 0.88em; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+.pm-tab:hover  { color: #e0e0e0; }
+.pm-tab.active { color: #e94560; border-bottom-color: #e94560; }
+
+.pm-search-wrap { position: relative; padding: 12px 20px; flex-shrink: 0; }
+.pm-search-icon { position: absolute; left: 33px; top: 50%; transform: translateY(-50%); color: #555; pointer-events: none; }
+.pm-search-input {
+    width: 100%; padding: 10px 14px 10px 36px;
+    background: #1a1a2e; border: 1px solid #2a2a45; border-radius: 10px;
+    color: #e0e0e0; font-size: 0.92em; box-sizing: border-box; transition: border-color 0.2s;
+}
+.pm-search-input:focus { outline: none; border-color: #e94560; }
+.pm-search-input::placeholder { color: #444; }
+
+.pm-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.pm-list::-webkit-scrollbar { width: 4px; }
+.pm-list::-webkit-scrollbar-thumb { background: #2a2a45; border-radius: 2px; }
+
+/* Product row */
+.pm-product-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 20px; border-bottom: 1px solid #13131f; transition: background 0.12s;
+}
+.pm-product-row:hover  { background: #13131f; }
+.pm-product-row:last-child { border-bottom: none; }
+
+.pm-thumb {
+    width: 42px; height: 42px; border-radius: 7px; object-fit: cover; flex-shrink: 0;
+    background: #1a1a2e; border: 1px solid #2a2a45;
+}
+.pm-thumb-placeholder {
+    width: 42px; height: 42px; border-radius: 7px; flex-shrink: 0;
+    background: #1a1a2e; border: 1px solid #2a2a45;
+    display: flex; align-items: center; justify-content: center;
+}
+.pm-info { flex: 1; min-width: 0; }
+.pm-name { font-size: 0.9em; font-weight: 600; color: #e0e0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pm-meta { display: flex; gap: 8px; margin-top: 3px; align-items: center; flex-wrap: wrap; }
+.pm-sku-badge { font-size: 0.72em; color: #888; background: #1a1a2e; border: 1px solid #2a2a45; padding: 1px 6px; border-radius: 4px; font-family: monospace; }
+.pm-stock     { font-size: 0.72em; color: #666; }
+
+/* Threshold inline edit */
+.pm-threshold-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.pm-threshold-label { font-size: 0.72em; color: #555; white-space: nowrap; }
+.pm-threshold-val   { font-size: 0.82em; font-weight: 700; color: #e0e0e0; min-width: 20px; }
+.pm-threshold-input {
+    width: 58px; padding: 5px 6px; text-align: center;
+    background: #1a1a2e; border: 1px solid #e94560; border-radius: 6px;
+    color: #e0e0e0; font-size: 0.85em; display: none;
+}
+.pm-threshold-input:focus { outline: none; }
+.pm-threshold-input.open  { display: block; }
+.btn-thresh-edit {
+    background: none; border: 1px solid #2a2a45; color: #555;
+    border-radius: 4px; padding: 3px 7px; font-size: 0.72em; cursor: pointer; transition: all 0.15s;
+}
+.btn-thresh-edit:hover { border-color: #e94560; color: #e94560; transform: none; filter: none; }
+.btn-thresh-save {
+    background: #e94560; color: #fff; border: none;
+    border-radius: 4px; padding: 3px 8px; font-size: 0.72em; cursor: pointer;
+    display: none; transition: filter 0.15s;
+}
+.btn-thresh-save:hover  { filter: brightness(1.1); }
+.btn-thresh-save.open   { display: block; }
+.btn-thresh-cancel {
+    background: none; border: 1px solid #2a2a45; color: #555;
+    border-radius: 4px; padding: 3px 6px; font-size: 0.72em; cursor: pointer;
+    display: none; transition: all 0.15s;
+}
+.btn-thresh-cancel:hover { border-color: #555; color: #999; transform: none; filter: none; }
+.btn-thresh-cancel.open { display: block; }
+.pm-thresh-status { font-size: 0.68em; min-width: 36px; }
+.pm-thresh-status.ok  { color: #28a745; }
+.pm-thresh-status.err { color: #e94560; }
+
+.btn-pm-action {
+    flex-shrink: 0; padding: 6px 12px; border: none; border-radius: 6px;
+    cursor: pointer; font-size: 0.8em; font-weight: 700; transition: filter 0.15s, opacity 0.2s;
+}
+.btn-pm-action.add    { background: #22c55e; color: #fff; }
+.btn-pm-action.add:hover    { filter: brightness(1.1); }
+.btn-pm-action.remove { background: #e94560; color: #fff; }
+.btn-pm-action.remove:hover { filter: brightness(1.1); }
+.btn-pm-action:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
+
+.pm-state { padding: 50px 20px; text-align: center; color: #444; font-size: 0.88em; }
+
+.pm-footer {
+    padding: 12px 20px; border-top: 1px solid #1e1e35;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0; background: #0c0c18; border-radius: 0 0 16px 16px;
+}
+.pm-footer-info { font-size: 0.8em; color: #555; }
+.btn-pm-close { padding: 8px 20px; background: none; color: #888; border: 1px solid #2a2a45; border-radius: 8px; cursor: pointer; font-size: 0.88em; transition: all 0.15s; }
+.btn-pm-close:hover { border-color: #e94560; color: #e94560; }
+</style>
+
+<div class="page-title">
+    <h1>Manage Categories</h1>
+    <p>Add, edit, remove categories and manage their products</p>
+</div>
+
+<div class="manage-layout">
+    <div class="manage-left">
+        <div class="manage-section-title">Existing Categories</div>
+        <div class="cat-list" id="catList"><div class="empty-cats">Loading...</div></div>
+    </div>
+    <div class="manage-right">
+        <div class="add-card">
+            <div class="add-card-title">Add New Category</div>
+            <div class="add-form">
+                <div class="field-group">
+                    <span class="field-label">Display Name</span>
+                    <input class="cat-input" id="newTitle" placeholder="e.g. Pillow Cases">
+                </div>
+                <div class="field-group">
+                    <span class="field-label">Shopify Tag</span>
+                    <input class="cat-input" id="newTag" placeholder="e.g. HJMQPC">
+                    <span class="field-hint">Tag applied to products in Shopify</span>
+                </div>
+                <div class="field-group">
+                    <span class="field-label">URL Slug</span>
+                    <input class="cat-input" id="newSlug" placeholder="e.g. pillow-cases">
+                    <span class="field-hint">Lowercase, hyphens only — auto-fills from name</span>
+                </div>
+                <button class="btn-add-cat" onclick="addCategory()">+ Add Category</button>
+                <div class="add-status" id="addStatus"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Product Management Modal -->
+<div class="pm-overlay" id="pmOverlay" onclick="handlePmOverlay(event)">
+    <div class="pm-modal">
+        <div class="pm-header">
+            <div class="pm-title-row">
+                <h3 id="pmTitle">Manage Products</h3>
+                <div style="display:flex;align-items:center;gap:10px;">
+                    <span class="pm-cat-tag" id="pmCatTag"></span>
+                    <button class="pm-close" onclick="closePmModal()">&#x2715;</button>
+                </div>
+            </div>
+            <div class="pm-tabs">
+                <button class="pm-tab active" id="tabIn"  onclick="switchTab('in')">In Category</button>
+                <button class="pm-tab"        id="tabAdd" onclick="switchTab('add')">Add Products</button>
+            </div>
+        </div>
+        <div class="pm-search-wrap" id="pmSearchWrap" style="display:none;">
+            <svg class="pm-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input class="pm-search-input" id="pmSearchInput" placeholder="Search by product name or SKU..." oninput="onPmSearch(this.value)" autocomplete="off">
+        </div>
+        <div class="pm-list" id="pmList"><div class="pm-state">Loading...</div></div>
+        <div class="pm-footer">
+            <span class="pm-footer-info" id="pmFooterInfo"></span>
+            <button class="btn-pm-close" onclick="closePmModal()">Done</button>
+        </div>
+    </div>
+</div>
+
+<script>
+var _cats = [], _pmSlug = '', _pmTag = '', _pmTab = 'in', _pmInProds = [], _pmSearchTimer = null;
+
+document.getElementById('newTitle').addEventListener('input', function() {
+    document.getElementById('newSlug').value = this.value.toLowerCase()
+        .replace(/[^a-z0-9\s\-]/g,'').trim().replace(/\s+/g,'-');
+});
+
+// ── Categories ────────────────────────────────────────────────────────────
+async function loadCats() {
+    try {
+        var res = await fetch('/api/stock_categories');
+        _cats = await res.json(); renderCats();
+    } catch(e) { document.getElementById('catList').innerHTML = '<div class="empty-cats">Failed to load</div>'; }
+}
+
+function renderCats() {
+    var list = document.getElementById('catList');
+    if (!_cats.length) { list.innerHTML = '<div class="empty-cats">No categories yet</div>'; return; }
+    list.innerHTML = '';
+    _cats.forEach(function(cat) {
+        var row = document.createElement('div');
+        row.id  = 'catrow-' + cat.slug;
+        row.innerHTML = buildCatRow(cat);
+        list.appendChild(row);
+    });
+}
+
+function buildCatRow(cat) {
+    return '<div class="cat-row">' +
+        '<div class="cat-info"><div class="cat-title">' + esc(cat.title) + '</div>' +
+        '<div class="cat-meta"><span class="cat-tag-badge">' + esc(cat.tag) + '</span>' +
+        '<span style="color:#555;">/stock/' + esc(cat.slug) + '</span></div></div>' +
+        '<div class="cat-actions">' +
+        '<button class="btn-cat products" onclick="openPmModal(\'' + cat.slug + '\',\'' + esc(cat.tag) + '\',\'' + esc(cat.title) + '\')">Products</button>' +
+        '<button class="btn-cat" onclick="openEditCat(\'' + cat.slug + '\')">Edit</button>' +
+        '<button class="btn-cat del" onclick="deleteCategory(\'' + cat.slug + '\')">Delete</button>' +
+        '</div></div>';
+}
+
+function buildEditForm(cat) {
+    return '<div class="cat-edit-form">' +
+        '<div class="cat-edit-row">' +
+        '<div style="flex:1;display:flex;flex-direction:column;gap:3px;"><span class="cat-input-label">Display Name</span>' +
+        '<input class="cat-input" id="edit-title-' + cat.slug + '" value="' + esc(cat.title) + '"></div>' +
+        '<div style="flex:1;display:flex;flex-direction:column;gap:3px;"><span class="cat-input-label">Shopify Tag</span>' +
+        '<input class="cat-input" id="edit-tag-' + cat.slug + '" value="' + esc(cat.tag) + '"></div></div>' +
+        '<div style="font-size:0.72em;color:#555;">Slug: /stock/' + esc(cat.slug) + ' (not editable)</div>' +
+        '<div class="cat-edit-actions">' +
+        '<button class="btn-save-cat" onclick="saveCat(\'' + cat.slug + '\')">Save</button>' +
+        '<button class="btn-cancel-cat" onclick="cancelEditCat(\'' + cat.slug + '\')">Cancel</button></div>' +
+        '<div class="cat-status" id="edit-status-' + cat.slug + '"></div></div>';
+}
+
+function openEditCat(slug) {
+    var cat = _cats.find(function(c) { return c.slug===slug; });
+    if (cat) { document.getElementById('catrow-'+slug).innerHTML = buildEditForm(cat); document.getElementById('edit-title-'+slug).focus(); }
+}
+function cancelEditCat(slug) {
+    var cat = _cats.find(function(c) { return c.slug===slug; });
+    if (cat) document.getElementById('catrow-'+slug).innerHTML = buildCatRow(cat);
+}
+async function saveCat(slug) {
+    var title=document.getElementById('edit-title-'+slug).value.trim(), tag=document.getElementById('edit-tag-'+slug).value.trim();
+    var status=document.getElementById('edit-status-'+slug);
+    if (!title||!tag) { status.textContent='Name and tag required'; status.className='cat-status err'; return; }
+    status.textContent='Saving...'; status.className='cat-status';
+    try {
+        var res=await fetch('/api/stock_categories/'+slug,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,tag})});
+        var data=await res.json();
+        if (data.success) { var cat=_cats.find(function(c){return c.slug===slug;}); if(cat){cat.title=title;cat.tag=tag;} document.getElementById('catrow-'+slug).innerHTML=buildCatRow({slug,title,tag}); }
+        else { status.textContent=data.error||'Save failed'; status.className='cat-status err'; }
+    } catch(e) { status.textContent='Network error'; status.className='cat-status err'; }
+}
+async function deleteCategory(slug) {
+    if (!confirm('Delete this category? Shopify products are not affected.')) return;
+    try {
+        var res=await fetch('/api/stock_categories/'+slug,{method:'DELETE'}), data=await res.json();
+        if (data.success) { _cats=_cats.filter(function(c){return c.slug!==slug;}); renderCats(); }
+    } catch(e) {}
+}
+async function addCategory() {
+    var title=document.getElementById('newTitle').value.trim(), tag=document.getElementById('newTag').value.trim(), slug=document.getElementById('newSlug').value.trim();
+    var status=document.getElementById('addStatus');
+    if (!title||!tag||!slug) { status.textContent='All fields required'; status.className='add-status err'; return; }
+    try {
+        var res=await fetch('/api/stock_categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,tag,slug})});
+        var data=await res.json();
+        if (data.success) {
+            ['newTitle','newTag','newSlug'].forEach(function(id){document.getElementById(id).value='';});
+            status.textContent='Category added!'; status.className='add-status ok';
+            setTimeout(function(){status.textContent='';},3000);
+            _cats.push({slug,title,tag}); renderCats();
+        } else { status.textContent=data.error||'Failed'; status.className='add-status err'; }
+    } catch(e) { status.textContent='Network error'; status.className='add-status err'; }
+}
+
+// ── Product Modal ─────────────────────────────────────────────────────────
+function openPmModal(slug, tag, title) {
+    _pmSlug=slug; _pmTag=tag; _pmTab='in';
+    document.getElementById('pmTitle').textContent = title + ' — Products';
+    document.getElementById('pmCatTag').textContent = tag;
+    document.getElementById('pmSearchInput').value = '';
+    document.getElementById('pmSearchWrap').style.display = 'none';
+    document.getElementById('tabIn').classList.add('active');
+    document.getElementById('tabAdd').classList.remove('active');
+    document.getElementById('pmOverlay').classList.add('open');
+    loadInCategory();
+}
+function closePmModal() { document.getElementById('pmOverlay').classList.remove('open'); }
+function handlePmOverlay(e) { if (e.target===document.getElementById('pmOverlay')) closePmModal(); }
+
+function switchTab(tab) {
+    _pmTab = tab;
+    document.getElementById('tabIn').classList.toggle('active',  tab==='in');
+    document.getElementById('tabAdd').classList.toggle('active', tab==='add');
+    document.getElementById('pmSearchWrap').style.display = tab==='add' ? 'block' : 'none';
+    if (tab==='in') { loadInCategory(); }
+    else { document.getElementById('pmList').innerHTML='<div class="pm-state">Search for products to add</div>'; document.getElementById('pmFooterInfo').textContent=''; setTimeout(function(){document.getElementById('pmSearchInput').focus();},80); }
+}
+
+async function loadInCategory() {
+    document.getElementById('pmList').innerHTML = '<div class="pm-state">Loading...</div>';
+    document.getElementById('pmFooterInfo').textContent = '';
+    try {
+        var res=await fetch('/api/category_products/'+_pmSlug), data=await res.json();
+        if (!data.success) { document.getElementById('pmList').innerHTML='<div class="pm-state">Error: '+esc(data.error)+'</div>'; return; }
+        _pmInProds = data.results;
+        renderInCategory(_pmInProds);
+    } catch(e) { document.getElementById('pmList').innerHTML='<div class="pm-state">Network error</div>'; }
+}
+
+function renderInCategory(prods) {
+    var list = document.getElementById('pmList');
+    document.getElementById('pmFooterInfo').textContent = prods.length + ' product(s) in this category';
+    if (!prods.length) { list.innerHTML='<div class="pm-state">No products in this category yet</div>'; return; }
+    list.innerHTML = '';
+    prods.forEach(function(p) { list.appendChild(buildInRow(p)); });
+}
+
+function buildInRow(p) {
+    var row       = document.createElement('div');
+    var numericId = p.id.split('/').pop();
+    row.className = 'pm-product-row';
+    row.id        = 'pmrow-' + numericId;
+
+    var thumbHtml = p.image
+        ? '<img class="pm-thumb" src="' + esc(p.image) + '" loading="lazy">'
+        : '<div class="pm-thumb-placeholder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>';
+
+    var stockColor = p.stock <= 0 ? '#e94560' : (p.stock < 5 ? '#f97316' : '#666');
+
+    row.innerHTML = thumbHtml +
+        '<div class="pm-info">' +
+            '<div class="pm-name">' + esc(p.title) + '</div>' +
+            '<div class="pm-meta">' +
+                (p.sku ? '<span class="pm-sku-badge">' + esc(p.sku) + '</span>' : '') +
+                '<span class="pm-stock" style="color:' + stockColor + '">Stock: ' + p.stock + '</span>' +
+            '</div>' +
+        '</div>' +
+        '<div class="pm-threshold-wrap">' +
+            '<span class="pm-threshold-label">Threshold:</span>' +
+            '<span class="pm-threshold-val" id="tval-' + numericId + '">' + p.threshold + '</span>' +
+            '<input type="number" class="pm-threshold-input" id="tinput-' + numericId + '" value="' + p.threshold + '" min="0" ' +
+                'onkeydown="handleThreshKey(event,\'' + numericId + '\',\'' + p.id + '\')">' +
+            '<button class="btn-thresh-edit" id="tedit-' + numericId + '" onclick="openThresh(\'' + numericId + '\')">Edit</button>' +
+            '<button class="btn-thresh-save open" id="tsave-' + numericId + '" onclick="saveThresh(\'' + numericId + '\',\'' + p.id + '\')" style="display:none;">Save</button>' +
+            '<button class="btn-thresh-cancel open" id="tcancel-' + numericId + '" onclick="cancelThresh(\'' + numericId + '\',\'' + p.threshold + '\')" style="display:none;">&#x2715;</button>' +
+            '<span class="pm-thresh-status" id="tstatus-' + numericId + '"></span>' +
+        '</div>' +
+        '<button class="btn-pm-action remove" onclick="removeProd(\'' + numericId + '\',\'' + esc(p.title) + '\',this)">Remove</button>';
+    return row;
+}
+
+function openThresh(id) {
+    document.getElementById('tval-'    + id).style.display   = 'none';
+    document.getElementById('tedit-'   + id).style.display   = 'none';
+    document.getElementById('tinput-'  + id).style.display   = 'block';
+    document.getElementById('tsave-'   + id).style.display   = 'block';
+    document.getElementById('tcancel-' + id).style.display   = 'block';
+    document.getElementById('tinput-'  + id).focus();
+    document.getElementById('tinput-'  + id).select();
+}
+function cancelThresh(id, orig) {
+    document.getElementById('tinput-'  + id).value           = orig;
+    document.getElementById('tinput-'  + id).style.display   = 'none';
+    document.getElementById('tsave-'   + id).style.display   = 'none';
+    document.getElementById('tcancel-' + id).style.display   = 'none';
+    document.getElementById('tval-'    + id).style.display   = '';
+    document.getElementById('tedit-'   + id).style.display   = '';
+    document.getElementById('tstatus-' + id).textContent     = '';
+}
+function handleThreshKey(e, id, gid) {
+    if (e.key === 'Enter')  saveThresh(id, gid);
+    if (e.key === 'Escape') cancelThresh(id, document.getElementById('tval-'+id).textContent);
+}
+async function saveThresh(id, gid) {
+    var val    = parseInt(document.getElementById('tinput-'+id).value);
+    var status = document.getElementById('tstatus-'+id);
+    if (isNaN(val)||val<0) { status.textContent='Invalid'; status.className='pm-thresh-status err'; return; }
+    status.textContent='...'; status.className='pm-thresh-status';
+    try {
+        var res  = await fetch('/api/update_threshold',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:gid,value:val})});
+        var data = await res.json();
+        if (data.success) {
+            document.getElementById('tval-'+id).textContent = val;
+            // update _pmInProds so cancel works correctly
+            var prod = _pmInProds.find(function(p){return p.id.split('/').pop()===id;});
+            if (prod) prod.threshold = val;
+            cancelThresh(id, val);
+            status.textContent='Saved'; status.className='pm-thresh-status ok';
+            setTimeout(function(){status.textContent='';},2000);
+        } else { status.textContent=data.error||'Failed'; status.className='pm-thresh-status err'; }
+    } catch(e) { status.textContent='Error'; status.className='pm-thresh-status err'; }
+}
+
+// ── Add tab ───────────────────────────────────────────────────────────────
+function onPmSearch(val) {
+    clearTimeout(_pmSearchTimer);
+    if (val.trim().length<2) { document.getElementById('pmList').innerHTML='<div class="pm-state">Type at least 2 characters</div>'; return; }
+    document.getElementById('pmList').innerHTML='<div class="pm-state">Searching...</div>';
+    _pmSearchTimer = setTimeout(function(){doPmSearch(val.trim());},350);
+}
+async function doPmSearch(q) {
+    try {
+        var res=await fetch('/api/search_products?q='+encodeURIComponent(q)), data=await res.json();
+        if (!data.success) { document.getElementById('pmList').innerHTML='<div class="pm-state">Error: '+esc(data.error)+'</div>'; return; }
+        var seen={}, deduped=[];
+        data.results.forEach(function(r){ if(!seen[r.product_id]){seen[r.product_id]=true;deduped.push(r);} });
+        renderAddResults(deduped);
+    } catch(e) { document.getElementById('pmList').innerHTML='<div class="pm-state">Network error</div>'; }
+}
+function renderAddResults(results) {
+    var list = document.getElementById('pmList');
+    document.getElementById('pmFooterInfo').textContent = results.length + ' result(s)';
+    if (!results.length) { list.innerHTML='<div class="pm-state">No products found</div>'; return; }
+    list.innerHTML='';
+    results.forEach(function(r) {
+        var alreadyIn = _pmInProds.some(function(p){return p.id.split('/').pop()===r.product_id;});
+        list.appendChild(buildAddRow(r, alreadyIn));
+    });
+}
+function buildAddRow(r, alreadyIn) {
+    var row = document.createElement('div');
+    row.className = 'pm-product-row';
+    row.id = 'pmrow-add-' + r.product_id;
+    var stockColor = r.stock<=0?'#e94560':(r.stock<5?'#f97316':'#666');
+    var thumbHtml  = r.image ? '<img class="pm-thumb" src="'+esc(r.image)+'" loading="lazy">' : '<div class="pm-thumb-placeholder"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>';
+    var btnHtml    = alreadyIn
+        ? '<button class="btn-pm-action add" disabled style="background:#333;color:#555;">In Category</button>'
+        : '<button class="btn-pm-action add" onclick="addProd(\''+r.product_id+'\',\''+esc(r.name.split(' — ')[0])+'\',this)">Add</button>';
+    row.innerHTML = thumbHtml +
+        '<div class="pm-info"><div class="pm-name">'+esc(r.name.split(' — ')[0])+'</div>' +
+        '<div class="pm-meta">'+(r.sku?'<span class="pm-sku-badge">'+esc(r.sku)+'</span>':'')+'<span class="pm-stock" style="color:'+stockColor+'">Stock: '+r.stock+'</span></div></div>' +
+        btnHtml;
+    return row;
+}
+
+async function addProd(numericId, title, btn) {
+    btn.disabled=true; btn.textContent='...';
+    try {
+        var res=await fetch('/api/category_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:numericId,tag:_pmTag})});
+        var data=await res.json();
+        if (data.success) {
+            btn.textContent='Added'; btn.style.background='#333'; btn.style.color='#555';
+            _pmInProds.push({id:'gid://shopify/Product/'+numericId,title:title,image:null,sku:'',stock:0,threshold:0});
+        } else { btn.disabled=false; btn.textContent='Add'; alert('Error: '+data.error); }
+    } catch(e) { btn.disabled=false; btn.textContent='Add'; }
+}
+async function removeProd(numericId, title, btn) {
+    if (!confirm('Remove "'+title+'" from this category?')) return;
+    btn.disabled=true; btn.textContent='...';
+    try {
+        var res=await fetch('/api/category_product',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:numericId,tag:_pmTag})});
+        var data=await res.json();
+        if (data.success) {
+            var row=document.getElementById('pmrow-'+numericId);
+            if (row) row.remove();
+            _pmInProds=_pmInProds.filter(function(p){return p.id.split('/').pop()!==numericId;});
+            document.getElementById('pmFooterInfo').textContent=_pmInProds.length+' product(s) in this category';
+            if (!_pmInProds.length) document.getElementById('pmList').innerHTML='<div class="pm-state">No products in this category yet</div>';
+        } else { btn.disabled=false; btn.textContent='Remove'; alert('Error: '+data.error); }
+    } catch(e) { btn.disabled=false; btn.textContent='Remove'; }
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+loadCats();
+</script>
+{% endblock %}
