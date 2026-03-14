@@ -11,6 +11,9 @@
     --success:      #28a745;
     --error-col:    #dc3545;
     --warning:      #e0a020;
+    --accent-color: #e94560;
+    --border-color: #33334d;
+    --item-bg:      #33334d;
 }
 
 body {
@@ -382,3 +385,5 @@ body {
     .qd-layout { flex-direction: column; }
     .qd-left   { width: 100%; }
 }
+
+
