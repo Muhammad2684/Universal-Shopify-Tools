@@ -10,10 +10,8 @@
 *, *::before, *::after { box-sizing: border-box; }
 ul { list-style: none; padding: 0; margin: 0; }
 
-/* ── Two-panel layout ── */
 .acc-layout { display: flex; gap: 40px; width: 100%; }
 
-/* ── LEFT PANEL ── */
 .acc-left {
     width: 340px; flex-shrink: 0;
     border-right: 1px solid var(--border-color);
@@ -29,43 +27,22 @@ ul { list-style: none; padding: 0; margin: 0; }
     border-bottom: 1px solid var(--border-color);
 }
 
-/* ── Entry type tabs ── */
 .type-tabs {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    margin-bottom: 14px;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px; margin-bottom: 14px;
 }
 .type-tab {
-    padding: 9px 10px;
-    border: 1px solid var(--border-color);
-    border-radius: 7px;
-    background-color: var(--item-bg);
-    color: var(--text-dark);
-    font-size: 0.82em; font-weight: 600;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.18s;
-    line-height: 1.3;
+    padding: 9px 10px; border: 1px solid var(--border-color);
+    border-radius: 7px; background-color: var(--item-bg);
+    color: var(--text-dark); font-size: 0.82em; font-weight: 600;
+    cursor: pointer; text-align: center; transition: all 0.18s; line-height: 1.3;
 }
 .type-tab:hover { border-color: var(--accent-color); color: var(--text-light); transform: none; }
-.type-tab.active {
-    background-color: var(--accent-color);
-    border-color: var(--accent-color);
-    color: #fff;
-}
-.type-tab .tab-rate {
-    display: block;
-    font-size: 0.78em;
-    font-weight: 400;
-    opacity: 0.85;
-    margin-top: 2px;
-}
+.type-tab.active { background-color: var(--accent-color); border-color: var(--accent-color); color: #fff; }
+.type-tab .tab-rate { display: block; font-size: 0.78em; font-weight: 400; opacity: 0.85; margin-top: 2px; }
 
-/* ── Entry form ── */
 .entry-form { display: flex; flex-direction: column; gap: 10px; }
 .entry-form label { font-size: 0.88em; color: var(--text-dark); margin-bottom: 2px; display: block; }
-
 .entry-form input[type="number"],
 .entry-form input[type="date"],
 .entry-form select {
@@ -82,37 +59,30 @@ ul { list-style: none; padding: 0; margin: 0; }
 .date-weekend { border-color: #eab308 !important; }
 .day-badge {
     font-size: 0.8em; font-weight: 600; padding: 3px 10px;
-    border-radius: 20px; display: inline-block; margin-top: -4px;
-    margin-bottom: 2px;
+    border-radius: 20px; display: inline-block; margin-top: -4px; margin-bottom: 2px;
 }
-.day-badge.weekday  { background-color: rgba(34,197,94,0.15);  color: #22c55e; }
-.day-badge.weekend  { background-color: rgba(234,179,8,0.15);  color: #eab308; }
+.day-badge.weekday { background-color: rgba(34,197,94,0.15); color: #22c55e; }
+.day-badge.weekend { background-color: rgba(234,179,8,0.15); color: #eab308; }
 
 .entry-preview {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary); border: 1px solid var(--border-color);
     border-radius: 6px; padding: 10px 14px;
     font-size: 0.9em; color: var(--text-dark);
     display: flex; justify-content: space-between; align-items: center;
 }
-.entry-preview .preview-earn {
-    font-size: 1.1em; font-weight: 700; color: var(--accent-color);
-}
+.entry-preview .preview-earn { font-size: 1.1em; font-weight: 700; color: var(--accent-color); }
 
 .btn-row { display: flex; gap: 8px; }
 .btn-primary {
-    flex: 1; padding: 11px 16px;
-    background-color: #16a34a; color: #fff;
-    border: none; border-radius: 6px;
-    font-size: 1em; font-weight: 600; cursor: pointer;
+    flex: 1; padding: 11px 16px; background-color: #16a34a; color: #fff;
+    border: none; border-radius: 6px; font-size: 1em; font-weight: 600; cursor: pointer;
     transition: filter 0.2s, transform 0.15s;
 }
 .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .btn-primary:active { transform: translateY(0); }
 
 .btn-icon-sm {
-    padding: 11px 14px; border: none; border-radius: 6px;
-    color: #fff; cursor: pointer;
+    padding: 11px 14px; border: none; border-radius: 6px; color: #fff; cursor: pointer;
     display: flex; align-items: center; justify-content: center;
     transition: filter 0.2s, transform 0.15s;
 }
@@ -122,38 +92,24 @@ ul { list-style: none; padding: 0; margin: 0; }
 .btn-undo { background-color: #b45309; }
 .btn-redo { background-color: #2563eb; }
 
-/* ── Summary Card ── */
 .summary-card {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary); border: 1px solid var(--border-color);
     border-radius: 10px; padding: 16px 18px;
 }
-.summary-total {
-    font-size: 2em; font-weight: 700;
-    color: var(--accent-color); line-height: 1;
-}
+.summary-total { font-size: 2em; font-weight: 700; color: var(--accent-color); line-height: 1; }
 .summary-label {
     font-size: 0.78em; color: var(--text-dark);
     text-transform: uppercase; letter-spacing: 0.05em;
     margin-top: 3px; margin-bottom: 12px;
 }
-.summary-breakdown {
-    display: grid; grid-template-columns: 1fr 1fr;
-    gap: 6px; margin-top: 12px;
-}
-.breakdown-item {
-    background-color: var(--bg-primary);
-    border-radius: 6px; padding: 8px 10px;
-    font-size: 0.8em;
-}
+.summary-breakdown { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+.breakdown-item { background-color: var(--bg-primary); border-radius: 6px; padding: 8px 10px; font-size: 0.8em; }
 .breakdown-item .bi-label { color: var(--text-dark); margin-bottom: 2px; }
 .breakdown-item .bi-val   { color: var(--text-light); font-weight: 600; }
 
-/* ── Export / Danger ── */
 .action-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn-export {
-    flex: 1; padding: 9px 10px;
-    border: 1px solid var(--border-color); border-radius: 6px;
+    flex: 1; padding: 9px 10px; border: 1px solid var(--border-color); border-radius: 6px;
     background-color: var(--item-bg); color: var(--text-light); font-size: 0.85em;
     cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 5px;
     transition: border-color 0.2s, filter 0.2s, transform 0.15s;
@@ -161,76 +117,129 @@ ul { list-style: none; padding: 0; margin: 0; }
 .btn-export:hover { border-color: var(--accent-color); filter: brightness(1.1); transform: translateY(-1px); }
 .btn-export:active { transform: translateY(0); }
 
-/* Export result box */
 .export-result {
-    display: none;
-    margin-top: 10px;
-    padding: 10px 12px;
-    background: rgba(34,197,94,0.08);
-    border: 1px solid rgba(34,197,94,0.25);
-    border-radius: 6px;
-    font-size: 0.8em;
-    word-break: break-all;
-    line-height: 1.5;
+    display: none; margin-top: 10px; padding: 10px 12px;
+    background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.25);
+    border-radius: 6px; font-size: 0.8em; word-break: break-all; line-height: 1.5;
 }
-.export-result .export-label {
-    color: #22c55e; font-weight: 600; display: block; margin-bottom: 3px;
-}
-.export-result .export-path {
-    color: var(--text-dark);
-    font-family: monospace;
-    font-size: 0.95em;
-}
+.export-result .export-label { color: #22c55e; font-weight: 600; display: block; margin-bottom: 3px; }
+.export-result .export-path  { color: var(--text-dark); font-family: monospace; font-size: 0.95em; }
 
 .btn-danger {
-    width: 100%; padding: 9px;
-    background-color: transparent; border: 1px solid #dc3545; color: #dc3545;
+    width: 100%; padding: 9px; background-color: transparent;
+    border: 1px solid #dc3545; color: #dc3545;
     border-radius: 6px; font-size: 0.85em; cursor: pointer;
     transition: background-color 0.2s, transform 0.15s;
 }
 .btn-danger:hover { background-color: #dc3545; color: #fff; transform: translateY(-1px); }
 .btn-danger:active { transform: translateY(0); }
 
-/* ── RIGHT PANEL ── */
-.acc-right {
-    flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0;
-}
+.acc-right { flex: 1; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 
-/* Chart */
 .chart-wrap {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary); border: 1px solid var(--border-color);
     border-radius: 10px; padding: 18px 20px;
 }
 .chart-container { position: relative; height: 240px; }
 
-/* Filter bar */
-.filter-bar {
-    display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-}
+/* ── Filter bar ── */
+.filter-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .filter-bar label { font-size: 0.85em; color: var(--text-dark); }
 .filter-select {
-    padding: 7px 10px;
-    border: 1px solid var(--input-border); border-radius: 6px;
+    padding: 7px 10px; border: 1px solid var(--input-border); border-radius: 6px;
     background-color: var(--input-bg); color: var(--text-light);
     font-size: 0.85em; cursor: pointer;
 }
 .filter-select:focus { border-color: var(--accent-color); outline: none; }
 
-/* ── Entries Table ── */
+/* ── Date filter button ── */
+.btn-date-filter {
+    padding: 7px 12px;
+    border: 1px solid var(--input-border); border-radius: 6px;
+    background-color: var(--input-bg); color: var(--text-light);
+    font-size: 0.85em; cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+    transition: border-color 0.2s;
+    margin: 0; white-space: nowrap;
+}
+.btn-date-filter:hover { border-color: var(--accent-color); transform: none; filter: none; }
+.btn-date-filter.active {
+    border-color: var(--accent-color);
+    background-color: rgba(233,69,96,0.12);
+    color: var(--accent-color);
+    font-weight: 600;
+}
+.btn-date-clear {
+    padding: 7px 10px; border: 1px solid var(--border-color); border-radius: 6px;
+    background: none; color: var(--text-dark); font-size: 0.82em; cursor: pointer;
+    display: none; align-items: center; gap: 4px;
+    transition: border-color 0.2s, color 0.2s; margin: 0;
+}
+.btn-date-clear:hover { border-color: var(--accent-color); color: var(--accent-color); transform: none; filter: none; }
+.btn-date-clear.visible { display: flex; }
+
+/* ── Date picker popup ── */
+.datepicker-popup {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 500;
+    background: var(--bg-secondary);
+    border: 1px solid var(--accent-color);
+    border-radius: 10px;
+    padding: 16px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.6);
+    min-width: 240px;
+    animation: dpop 0.15s ease;
+}
+.datepicker-popup.open { display: block; }
+@keyframes dpop { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.datepicker-popup .dp-label {
+    font-size: 0.78em; color: var(--text-dark);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    display: block; margin-bottom: 8px;
+}
+/* This date input is NOT inside .entry-form so it does NOT get -webkit-appearance:none */
+.datepicker-popup .dp-input {
+    width: 100%; padding: 10px 12px;
+    border: 1px solid var(--input-border); border-radius: 6px;
+    font-size: 0.95em;
+    background-color: var(--input-bg); color: var(--text-light);
+    transition: border-color 0.2s; margin-bottom: 10px;
+    box-sizing: border-box;
+}
+.datepicker-popup .dp-input:focus { border-color: var(--accent-color); outline: none; }
+.datepicker-popup .dp-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.6); cursor: pointer;
+}
+.datepicker-btns { display: flex; gap: 8px; }
+.btn-dp-apply {
+    flex: 1; padding: 8px; background: var(--accent-color); color: #fff;
+    border: none; border-radius: 6px; font-size: 0.85em; font-weight: 700;
+    cursor: pointer; transition: filter 0.15s;
+}
+.btn-dp-apply:hover { filter: brightness(1.1); }
+.btn-dp-cancel {
+    padding: 8px 12px; background: none; color: var(--text-dark);
+    border: 1px solid var(--border-color); border-radius: 6px;
+    font-size: 0.85em; cursor: pointer; transition: all 0.15s;
+}
+.btn-dp-cancel:hover { border-color: var(--accent-color); color: var(--accent-color); }
+
+/* ── Entries table ── */
 .entries-wrap {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
+    background-color: var(--bg-secondary); border: 1px solid var(--border-color);
     border-radius: 10px; overflow: hidden;
 }
 .entries-table-head {
     display: grid;
     grid-template-columns: 44px 100px 90px 110px 1fr 110px 100px;
-    padding: 10px 16px;
-    background-color: var(--bg-primary);
+    padding: 10px 16px; background-color: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
-    font-size: 0.75em; font-weight: 700;
-    color: var(--text-dark); text-transform: uppercase; letter-spacing: 0.05em;
+    font-size: 0.75em; font-weight: 700; color: var(--text-dark);
+    text-transform: uppercase; letter-spacing: 0.05em;
 }
 .entries-list { max-height: 420px; overflow-y: auto; }
 .entries-list::-webkit-scrollbar { width: 6px; }
@@ -240,58 +249,44 @@ ul { list-style: none; padding: 0; margin: 0; }
 .entry-row {
     display: grid;
     grid-template-columns: 44px 100px 90px 110px 1fr 110px 100px;
-    padding: 11px 16px;
-    border-bottom: 1px solid var(--border-color);
-    align-items: center; font-size: 0.9em;
-    transition: background-color 0.15s;
+    padding: 11px 16px; border-bottom: 1px solid var(--border-color);
+    align-items: center; font-size: 0.9em; transition: background-color 0.15s;
 }
 .entry-row:last-child { border-bottom: none; }
 .entry-row:hover { background-color: var(--item-bg); }
 
-.entry-num    { color: var(--text-dark); font-size: 0.82em; }
-.entry-date   { color: var(--text-dark); font-size: 0.88em; }
-.entry-earn   { color: var(--accent-color); font-weight: 700; }
+.entry-num  { color: var(--text-dark); font-size: 0.82em; }
+.entry-date { color: var(--text-dark); font-size: 0.88em; }
+.entry-earn { color: var(--accent-color); font-weight: 700; }
 .entry-actions { display: flex; gap: 5px; justify-content: flex-end; }
 
-.type-badge {
-    display: inline-block; padding: 2px 8px; border-radius: 12px;
-    font-size: 0.78em; font-weight: 600;
-}
-.type-badge.packed   { background: rgba(34,197,94,0.15);   color: #22c55e; }
-.type-badge.returned { background: rgba(59,130,246,0.15);  color: #60a5fa; }
-.type-badge.po       { background: rgba(168,85,247,0.15);  color: #c084fc; }
-.type-badge.custom   { background: rgba(234,179,8,0.15);   color: #facc15; }
+.type-badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.78em; font-weight: 600; }
+.type-badge.packed   { background: rgba(34,197,94,0.15);  color: #22c55e; }
+.type-badge.returned { background: rgba(59,130,246,0.15); color: #60a5fa; }
+.type-badge.po       { background: rgba(168,85,247,0.15); color: #c084fc; }
+.type-badge.custom   { background: rgba(234,179,8,0.15);  color: #facc15; }
 
-.day-badge-sm {
-    display: inline-block; padding: 2px 7px; border-radius: 10px;
-    font-size: 0.75em; font-weight: 600;
-}
-.day-badge-sm.weekday { background: rgba(34,197,94,0.1);  color: #22c55e; }
-.day-badge-sm.weekend { background: rgba(234,179,8,0.1);  color: #eab308; }
+.day-badge-sm { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 0.75em; font-weight: 600; }
+.day-badge-sm.weekday { background: rgba(34,197,94,0.1); color: #22c55e; }
+.day-badge-sm.weekend { background: rgba(234,179,8,0.1); color: #eab308; }
 
 .btn-row-edit {
-    background: none; border: 1px solid var(--border-color);
-    border-radius: 4px; color: var(--text-dark);
-    cursor: pointer; padding: 3px 8px; font-size: 0.78em; transition: all 0.15s;
+    background: none; border: 1px solid var(--border-color); border-radius: 4px;
+    color: var(--text-dark); cursor: pointer; padding: 3px 8px; font-size: 0.78em; transition: all 0.15s;
 }
 .btn-row-edit:hover { border-color: #2563eb; color: #2563eb; transform: none; }
 .btn-row-del {
-    background: none; border: 1px solid var(--border-color);
-    border-radius: 4px; color: var(--text-dark);
-    cursor: pointer; padding: 3px 8px; font-size: 0.78em; transition: all 0.15s;
+    background: none; border: 1px solid var(--border-color); border-radius: 4px;
+    color: var(--text-dark); cursor: pointer; padding: 3px 8px; font-size: 0.78em; transition: all 0.15s;
 }
 .btn-row-del:hover { border-color: #dc3545; color: #dc3545; transform: none; }
 
-.entries-empty {
-    padding: 48px 20px; text-align: center;
-    color: var(--text-dark); font-style: italic;
-}
+.entries-empty { padding: 48px 20px; text-align: center; color: var(--text-dark); font-style: italic; }
 
 /* ── Modal ── */
 .modal-overlay {
     display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,0.6);
-    align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.6); align-items: center; justify-content: center;
     z-index: 200; padding: 1rem;
 }
 .modal-overlay.open { display: flex; }
@@ -299,9 +294,8 @@ ul { list-style: none; padding: 0; margin: 0; }
     background-color: var(--bg-secondary); color: var(--text-light);
     border: 1px solid var(--border-color); border-radius: 10px; padding: 24px;
     box-shadow: 0 20px 40px rgba(0,0,0,0.6);
-    width: 380px; max-width: 95vw; animation: pop 0.15s ease;
+    width: 380px; max-width: 95vw;
 }
-@keyframes pop { from { transform: scale(0.93); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .modal-box h2 { font-size: 1.1em; font-weight: 700; margin-bottom: 10px; color: var(--accent-color); }
 .modal-box p  { font-size: 0.9em; margin-bottom: 18px; color: var(--text-dark); }
 .modal-btns   { display: flex; gap: 10px; justify-content: flex-end; }
@@ -331,7 +325,6 @@ ul { list-style: none; padding: 0; margin: 0; }
     margin-left: 8px; opacity: 0; transition: opacity 0.2s; vertical-align: middle;
 }
 .saving-dot.show { opacity: 1; }
-
 .editing-active { border-color: #eab308 !important; box-shadow: 0 0 0 2px rgba(234,179,8,0.2); }
 </style>
 </head>
@@ -351,7 +344,6 @@ ul { list-style: none; padding: 0; margin: 0; }
             <!-- ══ LEFT PANEL ══ -->
             <div class="acc-left">
 
-                <!-- Entry Type Tabs -->
                 <div>
                     <h3 class="acc-section-title">Entry Type</h3>
                     <div class="type-tabs">
@@ -374,29 +366,24 @@ ul { list-style: none; padding: 0; margin: 0; }
                     </div>
                 </div>
 
-                <!-- Entry Form -->
                 <div>
                     <h3 class="acc-section-title">Add Entry</h3>
                     <div class="entry-form">
-
                         <div>
                             <label for="entryDate">Date:</label>
                             <input type="date" id="entryDate" onchange="onDateChange()">
                             <div id="dayBadge" class="day-badge weekday" style="margin-top:6px;">Mon — Weekday</div>
                         </div>
-
                         <div id="qtyBlock">
                             <label for="entryQty" id="qtyLabel">Orders packed:</label>
                             <input type="number" id="entryQty" placeholder="e.g. 85" min="1"
                                    oninput="updatePreview()"
                                    onkeydown="if(event.key==='Enter') submitEntry()">
                         </div>
-
                         <div class="entry-preview">
                             <span id="previewDesc" style="color:var(--text-dark);">Enter a value to preview</span>
                             <span class="preview-earn" id="previewEarn">Rs. 0</span>
                         </div>
-
                         <div class="btn-row">
                             <button class="btn-primary" id="addBtn" onclick="submitEntry()">Add Entry</button>
                             <button class="btn-icon-sm btn-undo" id="undoBtn" onclick="undoAction()" title="Undo (Ctrl+Z)" disabled>
@@ -410,7 +397,6 @@ ul { list-style: none; padding: 0; margin: 0; }
                     </div>
                 </div>
 
-                <!-- Summary -->
                 <div>
                     <h3 class="acc-section-title">Summary</h3>
                     <div class="summary-card">
@@ -437,7 +423,6 @@ ul { list-style: none; padding: 0; margin: 0; }
                     </div>
                 </div>
 
-                <!-- Export & Danger -->
                 <div>
                     <h3 class="acc-section-title">Export</h3>
                     <div class="action-row" style="margin-bottom:10px;">
@@ -450,13 +435,10 @@ ul { list-style: none; padding: 0; margin: 0; }
                             CSV
                         </button>
                     </div>
-
-                    <!-- File saved confirmation + path -->
                     <div class="export-result" id="exportResult">
-                        <span class="export-label">✓ File saved:</span>
+                        <span class="export-label">File saved:</span>
                         <span class="export-path" id="exportPath"></span>
                     </div>
-
                     <button class="btn-danger" onclick="openDeleteModal()" style="margin-top:10px;">Delete All Entries</button>
                 </div>
 
@@ -465,7 +447,6 @@ ul { list-style: none; padding: 0; margin: 0; }
             <!-- ══ RIGHT PANEL ══ -->
             <div class="acc-right">
 
-                <!-- Chart -->
                 <div class="chart-wrap" id="chartWrap" style="display:none;">
                     <h3 class="acc-section-title" style="margin-bottom:14px;">Earnings Over Time</h3>
                     <div class="chart-container">
@@ -473,7 +454,6 @@ ul { list-style: none; padding: 0; margin: 0; }
                     </div>
                 </div>
 
-                <!-- Filter bar + Table -->
                 <div class="entries-wrap">
                     <div style="padding:12px 16px; border-bottom:1px solid var(--border-color); background-color:var(--bg-primary);">
                         <div class="filter-bar">
@@ -490,8 +470,32 @@ ul { list-style: none; padding: 0; margin: 0; }
                                 <option value="weekday">Weekdays</option>
                                 <option value="weekend">Weekends</option>
                             </select>
+
+                            <!-- Date filter: button opens a small popup containing a date input.
+                                 The input is NOT inside .entry-form so it keeps its native calendar icon. -->
+                            <div style="position:relative;">
+                                <button class="btn-date-filter" id="btnDateFilter" onclick="toggleDatePopup()">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                    <span id="btnDateLabel">Filter by Date</span>
+                                </button>
+                                <div class="datepicker-popup" id="datePickerPopup">
+                                    <span class="dp-label">Select a date</span>
+                                    <input type="date" class="dp-input" id="popupDateInput"
+                                           onchange="applyDateFilter(this.value)">
+                                    <div class="datepicker-btns">
+                                        <button class="btn-dp-apply" onclick="applyDateFilter(document.getElementById('popupDateInput').value)">Apply</button>
+                                        <button class="btn-dp-cancel" onclick="closeDatePopup()">Cancel</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button class="btn-date-clear" id="btnDateClear" onclick="clearDateFilter()">
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                Clear
+                            </button>
                         </div>
                     </div>
+
                     <div class="entries-table-head">
                         <span>#</span>
                         <span>Date</span>
@@ -530,34 +534,20 @@ ul { list-style: none; padding: 0; margin: 0; }
 <div class="toast" id="toast"></div>
 
 <script>
-// ── Pay Rates (constants) ─────────────────────────────────────────────────────
-const RATES = {
-    packed_weekday:  13,
-    packed_weekend:  15,
-    returned:        15,
-    po:               5,
-    custom:         100,
-};
-
-const TYPE_LABELS = {
-    packed:   'Packing',
-    returned: 'Returns',
-    po:       'PO',
-    custom:   'Custom',
-};
-
+const RATES = { packed_weekday: 13, packed_weekend: 15, returned: 15, po: 5, custom: 100 };
+const TYPE_LABELS = { packed: 'Packing', returned: 'Returns', po: 'PO', custom: 'Custom' };
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const DAY_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
-// ── State ─────────────────────────────────────────────────────────────────────
-let entries    = [];
-let undoStack  = [];
-let redoStack  = [];
-let editingIdx = null;
-let activeType = 'packed';
-let chart      = null;
-let toastTimer = null;
-let saveDotTimer = null;
+let entries        = [];
+let undoStack      = [];
+let redoStack      = [];
+let editingIdx     = null;
+let activeType     = 'packed';
+let chart          = null;
+let toastTimer     = null;
+let saveDotTimer   = null;
+let activeDateFilter = null;
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 async function persist() {
@@ -614,26 +604,65 @@ function onDateChange() {
     const dateInput = document.getElementById('entryDate');
     badge.textContent = `${info.dayName} — ${info.isWeekend ? 'Weekend' : 'Weekday'}`;
     badge.className   = `day-badge ${info.isWeekend ? 'weekend' : 'weekday'}`;
-    if (info.isWeekend) {
-        dateInput.classList.add('date-weekend');
-    } else {
-        dateInput.classList.remove('date-weekend');
-    }
+    dateInput.classList.toggle('date-weekend', info.isWeekend);
     updatePreview();
 }
 
+// ── Date filter popup ─────────────────────────────────────────────────────────
+function toggleDatePopup() {
+    const popup = document.getElementById('datePickerPopup');
+    if (popup.classList.contains('open')) {
+        closeDatePopup();
+    } else {
+        popup.classList.add('open');
+        if (activeDateFilter) {
+            document.getElementById('popupDateInput').value = activeDateFilter;
+        }
+        setTimeout(() => document.getElementById('popupDateInput').focus(), 60);
+    }
+}
+
+function closeDatePopup() {
+    document.getElementById('datePickerPopup').classList.remove('open');
+}
+
+function applyDateFilter(val) {
+    if (!val) return;
+    activeDateFilter = val;
+    const info = getDateInfo(val);
+    document.getElementById('btnDateFilter').classList.add('active');
+    document.getElementById('btnDateLabel').textContent = info.displayDate;
+    document.getElementById('btnDateClear').classList.add('visible');
+    closeDatePopup();
+    render();
+}
+
+function clearDateFilter() {
+    activeDateFilter = null;
+    document.getElementById('popupDateInput').value = '';
+    document.getElementById('btnDateFilter').classList.remove('active');
+    document.getElementById('btnDateLabel').textContent = 'Filter by Date';
+    document.getElementById('btnDateClear').classList.remove('visible');
+    render();
+}
+
+// Close popup when clicking outside
+document.addEventListener('click', function(e) {
+    const popup = document.getElementById('datePickerPopup');
+    const btn   = document.getElementById('btnDateFilter');
+    if (popup && popup.classList.contains('open') &&
+        !popup.contains(e.target) && !btn.contains(e.target)) {
+        closeDatePopup();
+    }
+});
+
 // ── Type selection ────────────────────────────────────────────────────────────
 const QTY_LABELS = {
-    packed:   'Orders packed:',
-    returned: 'Returns processed:',
-    po:       'Units in PO:',
-    custom:   'Custom orders printed:',
+    packed: 'Orders packed:', returned: 'Returns processed:',
+    po: 'Units in PO:', custom: 'Custom orders printed:',
 };
 const QTY_PLACEHOLDERS = {
-    packed:   'e.g. 85',
-    returned: 'e.g. 12',
-    po:       'e.g. 200',
-    custom:   'e.g. 5',
+    packed: 'e.g. 85', returned: 'e.g. 12', po: 'e.g. 200', custom: 'e.g. 5',
 };
 
 function selectType(type) {
@@ -641,15 +670,15 @@ function selectType(type) {
     ['packed','returned','po','custom'].forEach(t => {
         document.getElementById(`tab-${t}`).classList.toggle('active', t === type);
     });
-    document.getElementById('qtyLabel').textContent    = QTY_LABELS[type];
-    document.getElementById('entryQty').placeholder    = QTY_PLACEHOLDERS[type];
-    document.getElementById('entryQty').value          = '';
-    document.getElementById('dayBadge').style.display  = (type === 'packed') ? 'inline-block' : 'none';
+    document.getElementById('qtyLabel').textContent   = QTY_LABELS[type];
+    document.getElementById('entryQty').placeholder   = QTY_PLACEHOLDERS[type];
+    document.getElementById('entryQty').value         = '';
+    document.getElementById('dayBadge').style.display = (type === 'packed') ? 'inline-block' : 'none';
     updatePreview();
     document.getElementById('entryQty').focus();
 }
 
-// ── Earnings calculation ──────────────────────────────────────────────────────
+// ── Earnings ──────────────────────────────────────────────────────────────────
 function calcEarnings(type, qty, dateStr) {
     const n = parseInt(qty, 10);
     if (isNaN(n) || n < 1) return 0;
@@ -668,12 +697,11 @@ function updatePreview() {
     const dateStr = document.getElementById('entryDate').value;
     const n       = parseInt(qty, 10);
     const earn    = (n > 0 && dateStr) ? calcEarnings(activeType, n, dateStr) : 0;
-    let desc = '';
+    let desc = 'Enter a value to preview';
     if (n > 0 && dateStr) {
         if (activeType === 'packed') {
             const info = getDateInfo(dateStr);
-            const rate = info.isWeekend ? RATES.packed_weekend : RATES.packed_weekday;
-            desc = `${n} orders × Rs.${rate}`;
+            desc = `${n} orders × Rs.${info.isWeekend ? RATES.packed_weekend : RATES.packed_weekday}`;
         } else if (activeType === 'returned') {
             desc = `${n} returns × Rs.${RATES.returned}`;
         } else if (activeType === 'po') {
@@ -681,8 +709,6 @@ function updatePreview() {
         } else if (activeType === 'custom') {
             desc = `${n} prints × Rs.${RATES.custom}`;
         }
-    } else {
-        desc = 'Enter a value to preview';
     }
     document.getElementById('previewDesc').textContent = desc;
     document.getElementById('previewEarn').textContent = `Rs. ${earn.toLocaleString()}`;
@@ -694,17 +720,12 @@ function submitEntry() {
     const dateStr = document.getElementById('entryDate').value;
     const qty     = parseInt(qtyVal, 10);
     if (!dateStr) { showStatus('Please select a date.', 'error'); return; }
-    if (isNaN(qty) || qty < 1) { showStatus('Please enter a valid quantity (≥ 1).', 'error'); return; }
+    if (isNaN(qty) || qty < 1) { showStatus('Please enter a valid quantity (>= 1).', 'error'); return; }
     const info  = getDateInfo(dateStr);
     const earn  = calcEarnings(activeType, qty, dateStr);
     const entry = {
-        date:      dateStr,
-        display:   info.displayDate,
-        dayName:   info.dayName,
-        isWeekend: info.isWeekend,
-        type:      activeType,
-        qty,
-        earnings:  earn,
+        date: dateStr, display: info.displayDate, dayName: info.dayName,
+        isWeekend: info.isWeekend, type: activeType, qty, earnings: earn,
     };
     undoStack.push(JSON.parse(JSON.stringify(entries)));
     redoStack = [];
@@ -716,9 +737,7 @@ function submitEntry() {
         document.getElementById('entryQty').value = '';
     }
     hideStatus();
-    persist();
-    render();
-    updatePreview();
+    persist(); render(); updatePreview();
     document.getElementById('entryQty').focus();
 }
 
@@ -770,7 +789,11 @@ function redoAction() {
 document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); undoAction(); }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); redoAction(); }
-    if (e.key === 'Escape' && editingIdx !== null) cancelEdit();
+    if (e.key === 'Escape') {
+        const popup = document.getElementById('datePickerPopup');
+        if (popup && popup.classList.contains('open')) { closeDatePopup(); return; }
+        if (editingIdx !== null) cancelEdit();
+    }
 });
 
 // ── Delete All ────────────────────────────────────────────────────────────────
@@ -790,49 +813,38 @@ async function exportCSV() {
     if (!entries.length) { showToast('No entries to export'); return; }
     try {
         const res  = await fetch('/api/accountant/export', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ format: 'csv', entries })
         });
         const data = await res.json();
         if (data.success) {
             document.getElementById('exportPath').textContent = data.path;
             document.getElementById('exportResult').style.display = 'block';
-            showToast('CSV saved ✓');
-        } else {
-            showToast('Export failed: ' + (data.error || 'unknown error'));
-        }
-    } catch(e) {
-        showToast('Export failed');
-    }
+            showToast('CSV saved');
+        } else { showToast('Export failed: ' + (data.error || 'unknown')); }
+    } catch(e) { showToast('Export failed'); }
 }
 
 async function exportJSON() {
     if (!entries.length) { showToast('No entries to export'); return; }
     try {
         const res  = await fetch('/api/accountant/export', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ format: 'json', entries })
         });
         const data = await res.json();
         if (data.success) {
             document.getElementById('exportPath').textContent = data.path;
             document.getElementById('exportResult').style.display = 'block';
-            showToast('JSON saved ✓');
-        } else {
-            showToast('Export failed: ' + (data.error || 'unknown error'));
-        }
-    } catch(e) {
-        showToast('Export failed');
-    }
+            showToast('JSON saved');
+        } else { showToast('Export failed: ' + (data.error || 'unknown')); }
+    } catch(e) { showToast('Export failed'); }
 }
 
 // ── Status / Toast ────────────────────────────────────────────────────────────
 function showStatus(msg, type) {
     const el = document.getElementById('entryStatus');
-    el.textContent = msg; el.className = `status-message ${type}`;
-    el.style.display = 'block';
+    el.textContent = msg; el.className = `status-message ${type}`; el.style.display = 'block';
 }
 function hideStatus() { document.getElementById('entryStatus').style.display = 'none'; }
 function showToast(msg) {
@@ -843,12 +855,7 @@ function showToast(msg) {
 }
 
 // ── Chart ─────────────────────────────────────────────────────────────────────
-const TYPE_COLORS = {
-    packed:   '#22c55e',
-    returned: '#60a5fa',
-    po:       '#c084fc',
-    custom:   '#facc15',
-};
+const TYPE_COLORS = { packed: '#22c55e', returned: '#60a5fa', po: '#c084fc', custom: '#facc15' };
 
 function renderChart(filtered) {
     if (chart) { chart.destroy(); chart = null; }
@@ -862,29 +869,19 @@ function renderChart(filtered) {
     const datasets = ['packed','returned','po','custom'].map(t => ({
         label: TYPE_LABELS[t],
         data: sortedDates.map(d => dateMap[d][t] || 0),
-        borderColor: TYPE_COLORS[t],
-        backgroundColor: TYPE_COLORS[t] + '22',
-        pointBackgroundColor: TYPE_COLORS[t],
-        pointRadius: 4,
-        pointHoverRadius: 6,
-        borderWidth: 2,
-        tension: 0.3,
-        fill: false,
+        borderColor: TYPE_COLORS[t], backgroundColor: TYPE_COLORS[t] + '22',
+        pointBackgroundColor: TYPE_COLORS[t], pointRadius: 4, pointHoverRadius: 6,
+        borderWidth: 2, tension: 0.3, fill: false,
     }));
     chart = new Chart(document.getElementById('mainChart'), {
-        type: 'line',
-        data: { labels, datasets },
+        type: 'line', data: { labels, datasets },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: {
-                legend: {
-                    display: true,
-                    labels: { color: '#b0b0b0', font: { size: 11 }, boxWidth: 12, padding: 16 }
-                },
+                legend: { display: true, labels: { color: '#b0b0b0', font: { size: 11 }, boxWidth: 12, padding: 16 } },
                 tooltip: {
-                    backgroundColor: '#0f0f1d', titleColor: '#e0e0e0',
-                    bodyColor: '#b0b0b0', borderColor: '#33334d',
-                    borderWidth: 1, borderRadius: 8, padding: 10,
+                    backgroundColor: '#0f0f1d', titleColor: '#e0e0e0', bodyColor: '#b0b0b0',
+                    borderColor: '#33334d', borderWidth: 1, borderRadius: 8, padding: 10,
                     callbacks: { label: ctx => `${ctx.dataset.label}: Rs. ${ctx.raw.toLocaleString()}` }
                 }
             },
@@ -916,10 +913,12 @@ function render() {
 
     const typeFilter = document.getElementById('filterType').value;
     const dayFilter  = document.getElementById('filterDay').value;
+
     let filtered = entries.filter(e => {
         if (typeFilter !== 'all' && e.type !== typeFilter) return false;
         if (dayFilter === 'weekday' && e.isWeekend)  return false;
         if (dayFilter === 'weekend' && !e.isWeekend) return false;
+        if (activeDateFilter && e.date !== activeDateFilter) return false;
         return true;
     });
 
@@ -932,12 +931,19 @@ function render() {
     if (!filtered.length) {
         const empty = document.createElement('div');
         empty.className = 'entries-empty';
-        empty.textContent = entries.length ? 'No entries match the current filter.' : 'No entries yet. Add your first entry on the left.';
+        if (activeDateFilter) {
+            const info = getDateInfo(activeDateFilter);
+            empty.textContent = `No entries for ${info.displayDate}.`;
+        } else {
+            empty.textContent = entries.length
+                ? 'No entries match the current filter.'
+                : 'No entries yet. Add your first entry on the left.';
+        }
         list.appendChild(empty);
         return;
     }
 
-    const indexed = filtered.map((e, _) => ({ e, i: entries.indexOf(e) }));
+    const indexed = filtered.map(e => ({ e, i: entries.indexOf(e) }));
     indexed.reverse().forEach(({ e, i }) => {
         const row = document.createElement('div');
         row.className = 'entry-row';
