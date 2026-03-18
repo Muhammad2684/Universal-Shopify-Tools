@@ -26,7 +26,7 @@
 
 
 * ~~The "Add to Accountant" batch button from Scan \& Pack and Mark as Returned~~
-* Filter by Date
+* ~~Filter by Date button to open calendar to select date when viewing entries for a specific day~~
 
 
 
@@ -36,7 +36,7 @@
 
 * ~~Editable thresholds directly in the UI instead of going to Shopify metafields~~
 * ~~Feature to add categories within app UI~~
-* Display Skipped Orders on Top in CSV modal
+* ~~Display Skipped Orders on Top in CSV modal~~
 
 
 
@@ -45,7 +45,7 @@
 
 
 * ~~Product list dropdown upon searching SKUs~~
-* Show product name in queue beside SKU
+* Show product ~~name in queue beside SKU~~
 
 
 
@@ -53,9 +53,8 @@
 
 
 
-* Order notes in SAP — button under order details, opens popup to add Shopify order notes (Red box), shows existing notes (Green box)\[refer to reference image for box locations]
-* Packed list search — by order number, date, and note content
-* Removed/replaced item ghost bug — when an order is edited in Shopify (item removed or replaced), SAP and MAR still show both the old and new line items instead of only the current ones
+* ~~Order notes in SAP — button under order details, opens popup to add Shopify order notes (Red box), shows existing notes (Green box)\[refer to reference image for box locations]~~
+* ~~Packed list search — by order number, date, and note content~~
 
 
 
@@ -64,6 +63,7 @@
 ### Bug fixes:
 
 * ~~Browse products fix~~
+* ~~Removed/replaced item ghost bug — when an order is edited in Shopify (item removed or replaced), SAP and MAR still show both the old and new line items instead of only the current ones~~
 
 
 

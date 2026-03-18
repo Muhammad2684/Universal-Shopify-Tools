@@ -386,4 +386,40 @@ body {
     .qd-left   { width: 100%; }
 }
 
+/* ── Product name in SKU queue ─────────────────────────────────────────────
+   Append these three classes to the bottom of style5.css
+   ─────────────────────────────────────────────────────────────────────────── */
 
+/* Wraps SKU + name stacked vertically in the queue row */
+.item-sku-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+/* Product name shown below SKU in muted smaller text */
+.item-name {
+    font-size: 0.75em;
+    color: var(--text-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Edit mode — name input field in the inline edit row */
+.edit-name {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    color: var(--text-light);
+    padding: 3px 6px;
+    font-size: 0.8em;
+    box-sizing: border-box;
+    margin-top: 2px;
+}
+.edit-name:focus {
+    outline: none;
+    border-color: var(--accent);
+}

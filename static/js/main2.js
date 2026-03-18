@@ -367,6 +367,9 @@ function handleCsvUpload(file) {
                     span.textContent = `Skipped: ${reason}`;
                     span.style.color = '#e94560';
                     li.style.opacity = '0.6';
+                    // Move skipped rows to the top of the list
+                    const skipped = [...listContainer.querySelectorAll('li[data-valid="false"]')];
+                    skipped.forEach(li => listContainer.insertBefore(li, listContainer.firstChild));
                 }
             } catch (err) {
                 skippedCount++;
@@ -378,6 +381,9 @@ function handleCsvUpload(file) {
         }
 
         summary.textContent = `Done — ${validCount} valid, ${skippedCount} skipped`;
+
+        
+        
     };
     reader.readAsText(file);
     document.getElementById('csvInput').value = '';

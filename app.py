@@ -92,7 +92,7 @@ def credentials_ok():
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-APP_VERSION = "1.1.2"
+APP_VERSION = "1.1.3"
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
 
 _update_state = {"status": "idle", "percent": 0, "error": ""}
@@ -329,6 +329,9 @@ def fetch_order_data(order_identifier):
     response = requests.get(shopify_url, headers=headers, params=params)
     response.raise_for_status()
     orders = response.json().get("orders", [])
+    for o in orders[:1]:
+        for li in o.get('line_items', []):
+            print(f"[DEBUG] {li.get('title')} | qty={li.get('quantity')} | fulfillable_qty={li.get('fulfillable_quantity')} | requires_shipping={li.get('requires_shipping')}")
 
     order = None
     if is_tracking_search:
@@ -404,7 +407,8 @@ def fetch_order_data(order_identifier):
             "product_image":      image_cache.get(product_id),
             "in_stock":           in_stock,
             "available_quantity": available_quantity,
-            "customized_name":    customized_name
+            "customized_name":    customized_name,
+            "removed":            item.get('fulfillable_quantity', 1) == 0,
         })
 
     return {
@@ -415,6 +419,7 @@ def fetch_order_data(order_identifier):
         "tags":               order.get('tags', ''),
         "city":               (order.get('shipping_address') or {}).get('city', ''),
         "total_price":        order.get('total_price', '0'),
+        "note":               order.get('note', '') or '',
     }, None, 200
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -553,6 +558,26 @@ def tag_order_as_packed(order_id):
         update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
         return jsonify({"message": "Order tagged successfully", "tag": packed_tag})
+    except requests.exceptions.HTTPError as e:
+        return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
+    except Exception as e:
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+    
+@app.route('/api/order_note/<order_id>', methods=['POST'])
+def save_order_note(order_id):
+    if not credentials_ok():
+        return jsonify({"error": "No store profile active."}), 500
+    data = request.get_json()
+    note = data.get('note', '')
+    headers = get_headers()
+    order_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders/{order_id}.json"
+    try:
+        update_response = requests.put(
+            order_url, headers=headers,
+            json={"order": {"id": order_id, "note": note}}
+        )
+        update_response.raise_for_status()
+        return jsonify({"success": True, "note": note})
     except requests.exceptions.HTTPError as e:
         return jsonify({"error": "Shopify API error", "details": e.response.text}), e.response.status_code
     except Exception as e:

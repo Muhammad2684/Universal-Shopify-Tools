@@ -416,7 +416,7 @@
                 : '<div class="prod-thumb-placeholder"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></div>';
 
             row.innerHTML =
-                '<div class="prod-checkbox-wrap"><input type="checkbox" class="prod-checkbox" ' + (isSelected ? 'checked' : '') + ' onchange="toggleProdSelect(\'' + escProd(r.sku) + '\', this)" onclick="event.stopPropagation()"></div>' +
+                '<div class="prod-checkbox-wrap"><input type="checkbox" class="prod-checkbox" ' + (isSelected ? 'checked' : '') + ' onchange="toggleProdSelect(\'' + escProd(r.sku) + '\', this, \'' + escProd(r.name) + '\')" onclick="event.stopPropagation()"></div>' +
                 thumbHtml +
                 '<div class="prod-info">' +
                     '<div class="prod-name">' + escProd(r.name) + '</div>' +
@@ -437,18 +437,18 @@
                 if (e.target.tagName === 'INPUT') return;
                 var cb = row.querySelector('.prod-checkbox');
                 cb.checked = !cb.checked;
-                toggleProdSelect(r.sku, cb);
+                toggleProdSelect(r.sku, cb, r.name);
             });
             container.appendChild(row);
         });
     }
 
-    window.toggleProdSelect = function(sku, cb) {
+    window.toggleProdSelect = function(sku, cb, name) {
         var qtyInput = document.getElementById('qty-' + sku);
         var qty      = parseInt(qtyInput ? qtyInput.value : 1) || 1;
         var row      = cb.closest('.prod-result-item');
         if (cb.checked) {
-            _prodSelected[sku] = qty;
+            _prodSelected[sku] = { qty: qty, name: name || '' };
             if (row) row.classList.add('selected');
         } else {
             delete _prodSelected[sku];
@@ -459,7 +459,7 @@
 
     window.updateProdQty = function(sku, val) {
         if (_prodSelected[sku] !== undefined) {
-            _prodSelected[sku] = Math.max(1, parseInt(val) || 1);
+            _prodSelected[sku].qty = Math.max(1, parseInt(val) || 1);
         }
     };
 
@@ -472,7 +472,7 @@
     window.addSelectedProducts = function() {
         var entries = [];
         Object.keys(_prodSelected).forEach(function(sku) {
-            entries.push({ sku: sku, qty: _prodSelected[sku] });
+            entries.push({ sku: sku, qty: _prodSelected[sku].qty, name: _prodSelected[sku].name });
         });
         if (!entries.length) return;
         addItems(entries);

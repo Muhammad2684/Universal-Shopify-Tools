@@ -417,7 +417,7 @@
                 return;
             }
         } catch (e) {
-            setStatus('Could not reach the update server.', 'err');
+            setStatus('Update failed. If you see a permission error, restart the app as Administrator.', 'err');
             document.getElementById('updateNowBtn').disabled    = false;
             document.getElementById('updateCancelBtn').disabled = false;
             return;
@@ -451,7 +451,11 @@
                 } else if (data.status === 'error') {
                     clearInterval(_pollInterval);
                     _pollInterval = null;
-                    setStatus('Error: ' + data.error, 'err');
+                    if (data.error && data.error.includes('Permission denied')) {
+                        setStatus('Permission denied — please restart the app as Administrator and try again.', 'err');
+                    } else {
+                        setStatus('Error: ' + data.error, 'err');
+                    }
                     document.getElementById('updateNowBtn').disabled    = false;
                     document.getElementById('updateCancelBtn').disabled = false;
                 }
