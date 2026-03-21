@@ -454,7 +454,29 @@ def check_license():
     lic = load_license()
     if not lic:
         return redirect('/license')
-    
+    # Re-validate against server on every request
+    try:
+        resp = requests.post(
+            f'{LICENSE_SERVER}/api/validate',
+            json={'key': lic['key']},
+            timeout=5
+        )
+        data = resp.json()
+        if not data.get('valid'):
+            clear_license()
+            return redirect('/license')
+        # Update local license with latest info (including free_trial flag)
+        save_license({
+            'key':        lic['key'],
+            'plan':       data['plan'],
+            'label':      data['label'],
+            'expires_at': data.get('expires_at'),
+            'customer':   data.get('customer', ''),
+            'free_trial': data.get('free_trial', False),
+        })
+    except Exception:
+        pass  # Server unreachable — allow through (offline tolerance)
+
 @app.route('/license')
 def license_page():
     if load_license():
@@ -471,7 +493,14 @@ def license_validate():
         resp = requests.post(f'{LICENSE_SERVER}/api/validate', json={'key': key}, timeout=8)
         data = resp.json()
         if data.get('valid'):
-            save_license({'key': key, 'plan': data['plan'], 'label': data['label'], 'expires_at': data.get('expires_at'), 'customer': data.get('customer', '')})
+            save_license({
+                'key':        key,
+                'plan':       data['plan'],
+                'label':      data['label'],
+                'expires_at': data.get('expires_at'),
+                'customer':   data.get('customer', ''),
+                'free_trial': data.get('free_trial', False),
+            })
         return jsonify(data)
     except Exception:
         return jsonify({'valid': False, 'error': 'Could not reach license server'}), 500
@@ -486,7 +515,12 @@ def license_status():
     lic = load_license()
     if not lic:
         return jsonify({'valid': False})
-    return jsonify({'valid': True, 'plan': lic['plan'], 'label': lic['label']})
+    return jsonify({
+        'valid':      True,
+        'plan':       lic['plan'],
+        'label':      lic['label'],
+        'free_trial': lic.get('free_trial', False),
+    })
 
 @app.route('/')
 def home():
