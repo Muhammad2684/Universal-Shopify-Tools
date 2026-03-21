@@ -10,6 +10,7 @@
 * ~~Search/filter in Scan \& Pack order history — right now the packed list just grows with no way to find an order~~
 * ~~Keyboard shortcut to confirm/mark order without clicking the button — scan flow should be entirely hands-free~~
 * ~~Sound feedback on successful pack/return — a short beep so the operator doesn't have to look at the screen~~
+* Pay wall
 
 
 
@@ -64,6 +65,4 @@
 
 * ~~Browse products fix~~
 * ~~Removed/replaced item ghost bug — when an order is edited in Shopify (item removed or replaced), SAP and MAR still show both the old and new line items instead of only the current ones~~
-
-
 
