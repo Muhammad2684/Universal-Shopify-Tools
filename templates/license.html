@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universal Shopify Tools — License</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: 'Roboto', Arial, sans-serif;
+    background: #0f0f1d;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.license-wrap {
+    width: 420px;
+    max-width: 95vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+}
+
+.logo-area {
+    text-align: center;
+}
+
+.logo-area h1 {
+    color: #e94560;
+    font-size: 1.6em;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin-bottom: 6px;
+}
+
+.logo-area p {
+    font-size: 0.85em;
+    color: #b0b0b0;
+}
+
+.license-card {
+    width: 100%;
+    background: #1a1a2e;
+    border: 1px solid #33334d;
+    border-radius: 14px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.license-card label {
+    font-size: 0.78em;
+    color: #b0b0b0;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.key-input {
+    width: 100%;
+    padding: 13px 14px;
+    background: #2b2b40;
+    border: 1px solid #44446b;
+    border-radius: 8px;
+    color: #e0e0e0;
+    font-size: 1em;
+    font-family: monospace;
+    letter-spacing: 0.04em;
+    transition: border-color 0.2s;
+    text-transform: uppercase;
+}
+
+.key-input:focus {
+    outline: none;
+    border-color: #e94560;
+}
+
+.key-input.error { border-color: #dc3545; }
+.key-input.success { border-color: #22c55e; }
+
+.btn-activate {
+    width: 100%;
+    padding: 13px;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.15s;
+}
+.btn-activate:hover { filter: brightness(1.1); transform: translateY(-1px); }
+.btn-activate:active { transform: translateY(0); }
+.btn-activate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
+
+.status-msg {
+    font-size: 0.85em;
+    text-align: center;
+    min-height: 18px;
+    display: none;
+}
+.status-msg.error   { color: #e94560; display: block; }
+.status-msg.success { color: #22c55e; display: block; }
+.status-msg.loading { color: #b0b0b0; display: block; }
+
+.plan-badge {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.88em;
+    font-weight: 600;
+}
+.plan-badge.BASIC    { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.3); }
+.plan-badge.PRO      { background: rgba(192,132,252,0.12); color: #c084fc; border: 1px solid rgba(192,132,252,0.3); }
+.plan-badge.LIFETIME { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+
+.footer-note {
+    font-size: 0.78em;
+    color: #555;
+    text-align: center;
+}
+</style>
+</head>
+<body>
+<div class="license-wrap">
+
+    <div class="logo-area">
+        <h1>Universal Shopify Tools</h1>
+        <p>Enter your license key to continue</p>
+    </div>
+
+    <div class="license-card">
+        <div>
+            <label>License Key</label>
+            <input class="key-input" id="keyInput"
+                   placeholder="USHT-BASIC-XXX-XXX"
+                   autocomplete="off" spellcheck="false"
+                   onkeydown="if(event.key==='Enter') activate()">
+        </div>
+
+        <div class="plan-badge" id="planBadge"></div>
+        <div class="status-msg" id="statusMsg"></div>
+
+        <button class="btn-activate" id="activateBtn" onclick="activate()">Activate</button>
+    </div>
+
+    <p class="footer-note">Contact support on WhatsApp if you need help with your license key.</p>
+</div>
+
+<script>
+async function activate() {
+    const key    = document.getElementById('keyInput').value.trim().toUpperCase();
+    const btn    = document.getElementById('activateBtn');
+    const msg    = document.getElementById('statusMsg');
+    const input  = document.getElementById('keyInput');
+    const badge  = document.getElementById('planBadge');
+
+    if (!key) { showMsg('Please enter your license key.', 'error'); return; }
+
+    btn.disabled = true;
+    input.classList.remove('error', 'success');
+    badge.style.display = 'none';
+    showMsg('Validating...', 'loading');
+
+    try {
+        const res  = await fetch('/api/license/validate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key })
+        });
+        const data = await res.json();
+
+        if (data.valid) {
+            input.classList.add('success');
+            badge.className = 'plan-badge ' + data.plan;
+            badge.style.display = 'flex';
+            badge.textContent = data.label + ' Plan — Active';
+            showMsg('License activated successfully! Loading app...', 'success');
+            setTimeout(() => { window.location.href = '/'; }, 1200);
+        } else {
+            input.classList.add('error');
+            showMsg(data.error || 'Invalid license key.', 'error');
+            btn.disabled = false;
+        }
+    } catch(e) {
+        showMsg('Could not reach the license server. Check your internet connection.', 'error');
+        btn.disabled = false;
+    }
+}
+
+function showMsg(msg, type) {
+    const el = document.getElementById('statusMsg');
+    el.textContent  = msg;
+    el.className    = 'status-msg ' + type;
+}
+</script>
+</body>
+</html>

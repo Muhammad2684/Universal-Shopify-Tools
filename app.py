@@ -5,7 +5,7 @@ import threading
 import requests
 import datetime
 import csv
-from flask import Flask, render_template, jsonify, request, abort
+from flask import Flask, render_template, jsonify, request, abort, redirect, url_for
 
 # ── PyInstaller path resolution ──────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
@@ -17,6 +17,7 @@ else:
 
 BASE_DIR = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'UniversalSHTools')
 os.makedirs(BASE_DIR, exist_ok=True)
+
 
 active_creds = {
     "SHOPIFY_STORE_URL":    "",
@@ -47,6 +48,8 @@ def _clear_creds():
     active_creds["METAFIELD_KEY"]        = ""
 
 PROFILES_FILE = os.path.join(BASE_DIR, 'profiles.json')
+LICENSE_SERVER = "https://web-production-24ac0.up.railway.app"
+LICENSE_FILE   = os.path.join(BASE_DIR, 'license.json')
 
 def boot_active_profile():
     if not os.path.exists(PROFILES_FILE):
@@ -78,6 +81,23 @@ STOCK_CATEGORIES = {
     "bednet":   {"tag": "HJMQBN", "title": "Bed Net"},
     "7pcs":     {"tag": "HJMQ7P", "title": "7 Pcs"},
 }
+
+def load_license():
+    if os.path.exists(LICENSE_FILE):
+        try:
+            with open(LICENSE_FILE, 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return None
+
+def save_license(data):
+    with open(LICENSE_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def clear_license():
+    if os.path.exists(LICENSE_FILE):
+        os.remove(LICENSE_FILE)
 
 def get_headers():
     return {
@@ -425,6 +445,48 @@ def fetch_order_data(order_identifier):
 # ════════════════════════════════════════════════════════════════════════════
 # DASHBOARD
 # ════════════════════════════════════════════════════════════════════════════
+
+@app.before_request
+def check_license():
+    allowed = ['/license', '/api/license/validate', '/api/license/clear', '/static']
+    if any(request.path.startswith(p) for p in allowed):
+        return None
+    lic = load_license()
+    if not lic:
+        return redirect('/license')
+    
+@app.route('/license')
+def license_page():
+    if load_license():
+        return redirect('/')
+    return render_template('license.html')
+
+@app.route('/api/license/validate', methods=['POST'])
+def license_validate():
+    body = request.get_json(silent=True) or {}
+    key  = (body.get('key') or '').strip().upper()
+    if not key:
+        return jsonify({'valid': False, 'error': 'No key provided'}), 400
+    try:
+        resp = requests.post(f'{LICENSE_SERVER}/api/validate', json={'key': key}, timeout=8)
+        data = resp.json()
+        if data.get('valid'):
+            save_license({'key': key, 'plan': data['plan'], 'label': data['label'], 'expires_at': data.get('expires_at'), 'customer': data.get('customer', '')})
+        return jsonify(data)
+    except Exception:
+        return jsonify({'valid': False, 'error': 'Could not reach license server'}), 500
+
+@app.route('/api/license/clear', methods=['POST'])
+def license_clear():
+    clear_license()
+    return jsonify({'success': True})
+
+@app.route('/api/license/status', methods=['GET'])
+def license_status():
+    lic = load_license()
+    if not lic:
+        return jsonify({'valid': False})
+    return jsonify({'valid': True, 'plan': lic['plan'], 'label': lic['label']})
 
 @app.route('/')
 def home():
