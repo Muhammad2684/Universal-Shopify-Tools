@@ -108,6 +108,7 @@ def get_headers():
 def credentials_ok():
     return bool(SHOPIFY_STORE_URL() and SHOPIFY_ACCESS_TOKEN())
 
+
 # ════════════════════════════════════════════════════════════════════════════
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
@@ -349,9 +350,6 @@ def fetch_order_data(order_identifier):
     response = requests.get(shopify_url, headers=headers, params=params)
     response.raise_for_status()
     orders = response.json().get("orders", [])
-    for o in orders[:1]:
-        for li in o.get('line_items', []):
-            print(f"[DEBUG] {li.get('title')} | qty={li.get('quantity')} | fulfillable_qty={li.get('fulfillable_quantity')} | requires_shipping={li.get('requires_shipping')}")
 
     order = None
     if is_tracking_search:
@@ -416,6 +414,10 @@ def fetch_order_data(order_identifier):
             (p.get('value') for p in properties if p.get('name', '').lower() in ('customized name', 'custom name', 'name', 'personalization')),
             None
         )
+        
+        # current_quantity == 0 means the item was removed or fully refunded.
+        # This is reliable regardless of fulfillment status.
+        is_removed = item.get('current_quantity', item.get('quantity', 1)) == 0
 
         line_items.append({
             "product_id":         product_id,
@@ -428,7 +430,7 @@ def fetch_order_data(order_identifier):
             "in_stock":           in_stock,
             "available_quantity": available_quantity,
             "customized_name":    customized_name,
-            "removed":            item.get('fulfillable_quantity', 1) == 0,
+            "removed":            is_removed,
         })
 
     return {
