@@ -1038,10 +1038,18 @@ def show_category(category_slug):
         all_products  = process_product_edges(product_edges)
         for product in all_products:
             needed_qty = product['threshold'] - product['current_qty']
-            if needed_qty > 0:
-                product['needed_qty'] = needed_qty
-                products_to_display.append(product)
-    sorted_products = sorted(products_to_display, key=lambda p: p['needed_qty'], reverse=True)
+            product['needed_qty'] = max(needed_qty, 0)
+            product['above_threshold'] = needed_qty <= 0
+            products_to_display.append(product)
+
+    sorted_products = sorted(
+        products_to_display,
+        key=lambda p: (
+            p['above_threshold'],
+            -p['needed_qty'] if not p['above_threshold'] else p['current_qty'],
+            p['title'].lower()
+        )
+    )
     return render_template('category_page.html', products=sorted_products, page_title=category["title"],
                            active_page='stock', active_stock=category_slug)
 

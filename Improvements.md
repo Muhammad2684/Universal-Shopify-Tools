@@ -10,7 +10,7 @@
 * ~~Search/filter in Scan \& Pack order history — right now the packed list just grows with no way to find an order~~
 * ~~Keyboard shortcut to confirm/mark order without clicking the button — scan flow should be entirely hands-free~~
 * ~~Sound feedback on successful pack/return — a short beep so the operator doesn't have to look at the screen~~
-* Pay wall
+* ~~Pay wall~~
 
 
 
@@ -38,6 +38,9 @@
 * ~~Editable thresholds directly in the UI instead of going to Shopify metafields~~
 * ~~Feature to add categories within app UI~~
 * ~~Display Skipped Orders on Top in CSV modal~~
+* Geryed Products
+* Product Sizes under browse products
+* Subcategories
 
 
 
@@ -56,6 +59,7 @@
 
 * ~~Order notes in SAP — button under order details, opens popup to add Shopify order notes (Red box), shows existing notes (Green box)\[refer to reference image for box locations]~~
 * ~~Packed list search — by order number, date, and note content~~
+* Highlight special instructions
 
 
 
@@ -65,4 +69,5 @@
 
 * ~~Browse products fix~~
 * ~~Removed/replaced item ghost bug — when an order is edited in Shopify (item removed or replaced), SAP and MAR still show both the old and new line items instead of only the current ones~~
+* Error: 'NoneType' object has no attribute 'strip'
 
