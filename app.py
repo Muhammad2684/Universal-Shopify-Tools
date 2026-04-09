@@ -915,7 +915,15 @@ def save_categories(cats):
         json.dump(cats, f, indent=2)
 
 def get_stock_categories_dict():
-    return {c['slug']: {'tag': c['tag'], 'title': c['title']} for c in load_categories()}
+    cats = load_categories()
+    result = {}
+    for c in cats:
+        result[c['slug']] = {
+            'tag': c['tag'],
+            'title': c['title'],
+            'parent': c.get('parent'),
+        }
+    return result
 
 # ── Category CRUD routes ─────────────────────────────────────────────────────
 
@@ -930,6 +938,7 @@ def api_add_category():
     title = body.get('title', '').strip()
     tag   = body.get('tag',   '').strip()
     slug  = body.get('slug',  '').strip()
+    parent = body.get('parent', '').strip() or None
 
     if not title or not tag or not slug:
         return jsonify({'success': False, 'error': 'title, tag, and slug are all required'}), 400
@@ -942,7 +951,14 @@ def api_add_category():
     if any(c['slug'] == slug for c in cats):
         return jsonify({'success': False, 'error': f'Slug "{slug}" already exists'}), 400
 
-    cats.append({'slug': slug, 'title': title, 'tag': tag})
+    # Validate parent exists if provided
+    if parent and not any(c['slug'] == parent for c in cats):
+        return jsonify({'success': False, 'error': f'Parent category "{parent}" not found'}), 400
+
+    new_cat = {'slug': slug, 'title': title, 'tag': tag}
+    if parent:
+        new_cat['parent'] = parent
+    cats.append(new_cat)
     save_categories(cats)
     return jsonify({'success': True})
 
@@ -955,6 +971,21 @@ def api_update_category(slug):
         return jsonify({'success': False, 'error': 'Category not found'}), 404
     cat['title'] = body.get('title', cat['title']).strip()
     cat['tag']   = body.get('tag',   cat['tag']).strip()
+    
+    # Handle parent update
+    parent = body.get('parent')
+    if parent is not None:
+        parent = parent.strip() or None
+        if parent:
+            # Validate parent exists and is not self
+            if parent == slug:
+                return jsonify({'success': False, 'error': 'Category cannot be its own parent'}), 400
+            if not any(c['slug'] == parent for c in cats):
+                return jsonify({'success': False, 'error': f'Parent category "{parent}" not found'}), 400
+            cat['parent'] = parent
+        else:
+            cat.pop('parent', None)
+    
     save_categories(cats)
     return jsonify({'success': True})
 

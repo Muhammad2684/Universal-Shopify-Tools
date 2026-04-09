@@ -38,9 +38,10 @@
 * ~~Editable thresholds directly in the UI instead of going to Shopify metafields~~
 * ~~Feature to add categories within app UI~~
 * ~~Display Skipped Orders on Top in CSV modal~~
-* Geryed Products
-* Product Sizes under browse products
-* Subcategories
+* ~~Gerayed Products~~
+* ~~Product Sizes under browse products~~
+* ~~Subcategories~~
+* No product image
 
 
 

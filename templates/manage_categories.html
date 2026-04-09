@@ -233,6 +233,13 @@
                     <input class="cat-input" id="newSlug" placeholder="e.g. pillow-cases">
                     <span class="field-hint">Lowercase, hyphens only — auto-fills from name</span>
                 </div>
+                <div class="field-group">
+                    <span class="field-label">Parent Category</span>
+                    <select class="cat-input" id="newParent">
+                        <option value="">-- None (top-level) --</option>
+                    </select>
+                    <span class="field-hint">Leave blank to create a top-level category</span>
+                </div>
                 <button class="btn-add-cat" onclick="addCategory()">+ Add Category</button>
                 <div class="add-status" id="addStatus"></div>
             </div>
@@ -276,11 +283,22 @@ document.getElementById('newTitle').addEventListener('input', function() {
         .replace(/[^a-z0-9\s\-]/g,'').trim().replace(/\s+/g,'-');
 });
 
+function updateParentOptions() {
+    var sel = document.getElementById('newParent');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- None (top-level) --</option>';
+    _cats.forEach(function(c) {
+        sel.innerHTML += '<option value="' + esc(c.slug) + '">' + esc(c.title) + '</option>';
+    });
+}
+
 // ── Categories ────────────────────────────────────────────────────────────
 async function loadCats() {
     try {
         var res = await fetch('/api/stock_categories');
-        _cats = await res.json(); renderCats();
+        _cats = await res.json();
+        renderCats();
+        updateParentOptions();
     } catch(e) { document.getElementById('catList').innerHTML = '<div class="empty-cats">Failed to load</div>'; }
 }
 
@@ -297,8 +315,9 @@ function renderCats() {
 }
 
 function buildCatRow(cat) {
+    var parentLabel = cat.parent ? ' <span style="color:#888;font-size:0.82em;">(sub of ' + esc(cat.parent) + ')</span>' : '';
     return '<div class="cat-row">' +
-        '<div class="cat-info"><div class="cat-title">' + esc(cat.title) + '</div>' +
+        '<div class="cat-info"><div class="cat-title">' + esc(cat.title) + parentLabel + '</div>' +
         '<div class="cat-meta"><span class="cat-tag-badge">' + esc(cat.tag) + '</span>' +
         '<span style="color:#555;">/stock/' + esc(cat.slug) + '</span></div></div>' +
         '<div class="cat-actions">' +
@@ -308,6 +327,16 @@ function buildCatRow(cat) {
         '</div></div>';
 }
 
+function buildParentOptions(currentSlug) {
+    var opts = '<option value="">-- None (top-level) --</option>';
+    _cats.forEach(function(c) {
+        if (c.slug !== currentSlug) {
+            opts += '<option value="' + esc(c.slug) + '">' + esc(c.title) + '</option>';
+        }
+    });
+    return opts;
+}
+
 function buildEditForm(cat) {
     return '<div class="cat-edit-form">' +
         '<div class="cat-edit-row">' +
@@ -315,6 +344,8 @@ function buildEditForm(cat) {
         '<input class="cat-input" id="edit-title-' + cat.slug + '" value="' + esc(cat.title) + '"></div>' +
         '<div style="flex:1;display:flex;flex-direction:column;gap:3px;"><span class="cat-input-label">Shopify Tag</span>' +
         '<input class="cat-input" id="edit-tag-' + cat.slug + '" value="' + esc(cat.tag) + '"></div></div>' +
+        '<div style="display:flex;flex-direction:column;gap:3px;"><span class="cat-input-label">Parent Category</span>' +
+        '<select class="cat-input" id="edit-parent-' + cat.slug + '">' + buildParentOptions(cat.slug) + '</select></div>' +
         '<div style="font-size:0.72em;color:#555;">Slug: /stock/' + esc(cat.slug) + ' (not editable)</div>' +
         '<div class="cat-edit-actions">' +
         '<button class="btn-save-cat" onclick="saveCat(\'' + cat.slug + '\')">Save</button>' +
@@ -324,21 +355,31 @@ function buildEditForm(cat) {
 
 function openEditCat(slug) {
     var cat = _cats.find(function(c) { return c.slug===slug; });
-    if (cat) { document.getElementById('catrow-'+slug).innerHTML = buildEditForm(cat); document.getElementById('edit-title-'+slug).focus(); }
+    if (cat) {
+        document.getElementById('catrow-'+slug).innerHTML = buildEditForm(cat);
+        if (cat.parent) document.getElementById('edit-parent-'+slug).value = cat.parent;
+        document.getElementById('edit-title-'+slug).focus();
+    }
 }
 function cancelEditCat(slug) {
     var cat = _cats.find(function(c) { return c.slug===slug; });
     if (cat) document.getElementById('catrow-'+slug).innerHTML = buildCatRow(cat);
 }
 async function saveCat(slug) {
-    var title=document.getElementById('edit-title-'+slug).value.trim(), tag=document.getElementById('edit-tag-'+slug).value.trim();
-    var status=document.getElementById('edit-status-'+slug);
+    var title  = document.getElementById('edit-title-'+slug).value.trim();
+    var tag    = document.getElementById('edit-tag-'+slug).value.trim();
+    var parent = document.getElementById('edit-parent-'+slug).value || null;
+    var status = document.getElementById('edit-status-'+slug);
     if (!title||!tag) { status.textContent='Name and tag required'; status.className='cat-status err'; return; }
     status.textContent='Saving...'; status.className='cat-status';
     try {
-        var res=await fetch('/api/stock_categories/'+slug,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,tag})});
+        var res=await fetch('/api/stock_categories/'+slug,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,tag,parent})});
         var data=await res.json();
-        if (data.success) { var cat=_cats.find(function(c){return c.slug===slug;}); if(cat){cat.title=title;cat.tag=tag;} document.getElementById('catrow-'+slug).innerHTML=buildCatRow({slug,title,tag}); }
+        if (data.success) {
+            var cat=_cats.find(function(c){return c.slug===slug;});
+            if(cat){cat.title=title;cat.tag=tag;cat.parent=parent;}
+            document.getElementById('catrow-'+slug).innerHTML=buildCatRow({slug,title,tag,parent});
+        }
         else { status.textContent=data.error||'Save failed'; status.className='cat-status err'; }
     } catch(e) { status.textContent='Network error'; status.className='cat-status err'; }
 }
@@ -350,18 +391,22 @@ async function deleteCategory(slug) {
     } catch(e) {}
 }
 async function addCategory() {
-    var title=document.getElementById('newTitle').value.trim(), tag=document.getElementById('newTag').value.trim(), slug=document.getElementById('newSlug').value.trim();
-    var status=document.getElementById('addStatus');
+    var title  = document.getElementById('newTitle').value.trim();
+    var tag    = document.getElementById('newTag').value.trim();
+    var slug   = document.getElementById('newSlug').value.trim();
+    var parent = document.getElementById('newParent').value || null;
+    var status = document.getElementById('addStatus');
     if (!title||!tag||!slug) { status.textContent='All fields required'; status.className='add-status err'; return; }
     try {
-        var res=await fetch('/api/stock_categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,tag,slug})});
+        var res=await fetch('/api/stock_categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,tag,slug,parent})});
         var data=await res.json();
         if (data.success) {
             ['newTitle','newTag','newSlug'].forEach(function(id){document.getElementById(id).value='';});
+            document.getElementById('newParent').value = '';
             status.textContent='Category added!'; status.className='add-status ok';
             setTimeout(function(){status.textContent='';},3000);
-            _cats.push({slug,title,tag}); renderCats();
-        } else { status.textContent=data.error||'Failed'; status.className='add-status err'; }
+            _cats.push({slug,title,tag,parent}); renderCats(); updateParentOptions();
+        }
     } catch(e) { status.textContent='Network error'; status.className='add-status err'; }
 }
 

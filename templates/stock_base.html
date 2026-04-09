@@ -52,22 +52,86 @@
     </footer>
 
     <script>
-    // Inject dynamic category links into nav
-    (async function() {
+    // Inject dynamic category links into nav with subcategory dropdown support
+    (function() {
         var activeStock = "{{ active_stock }}";
-        try {
-            var res  = await fetch('/api/stock_categories');
-            var cats = await res.json();
+        var containers = [];
+
+        function closeAll() {
+            containers.forEach(function(c) { c.classList.remove('open'); });
+        }
+
+        function initDropdowns(cats) {
             var nav  = document.getElementById('stockNav');
             var manageLink = nav.querySelector('.stock-nav-manage');
-            cats.forEach(function(cat) {
-                var a = document.createElement('a');
-                a.href      = '/stock/' + cat.slug;
-                a.textContent = cat.title;
-                if (activeStock === cat.slug) a.classList.add('active');
-                nav.insertBefore(a, manageLink);
+
+            // Build hierarchy
+            var parents = cats.filter(function(c) { return !c.parent; });
+            var byParent = {};
+            cats.forEach(function(c) {
+                if (c.parent) {
+                    if (!byParent[c.parent]) byParent[c.parent] = [];
+                    byParent[c.parent].push(c);
+                }
             });
-        } catch(e) {}
+
+            // Render top-level categories
+            parents.forEach(function(cat) {
+                var subs = byParent[cat.slug];
+                if (subs && subs.length) {
+                    var container = document.createElement('div');
+                    container.className = 'cat-sub-container';
+
+                    var a = document.createElement('a');
+                    a.href = '/stock/' + cat.slug;
+                    a.className = 'cat-sub-trigger';
+                    a.innerHTML = cat.title + ' <span class="caret">&#9662;</span>';
+                    container.appendChild(a);
+
+                    var subNav = document.createElement('div');
+                    subNav.className = 'cat-sub-nav';
+                    subs.forEach(function(sub) {
+                        var subA = document.createElement('a');
+                        subA.href = '/stock/' + sub.slug;
+                        subA.textContent = sub.title;
+                        if (activeStock === sub.slug) subA.classList.add('active');
+                        subNav.appendChild(subA);
+                    });
+                    container.appendChild(subNav);
+                    nav.insertBefore(container, manageLink);
+                    containers.push(container);
+
+                    // Click trigger to toggle
+                    a.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        var wasOpen = container.classList.contains('open');
+                        closeAll();
+                        if (!wasOpen) container.classList.add('open');
+                    });
+                } else {
+                    var a = document.createElement('a');
+                    a.href = '/stock/' + cat.slug;
+                    a.textContent = cat.title;
+                    if (activeStock === cat.slug) a.classList.add('active');
+                    nav.insertBefore(a, manageLink);
+                }
+            });
+        }
+
+        // Close on outside click
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.cat-sub-container')) closeAll();
+        });
+
+        // Init once categories are ready
+        async function init() {
+            try {
+                var res  = await fetch('/api/stock_categories');
+                var cats = await res.json();
+                initDropdowns(cats);
+            } catch(e) {}
+        }
+        init();
     })();
     </script>
 </body>
