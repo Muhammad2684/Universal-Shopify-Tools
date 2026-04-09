@@ -26,6 +26,13 @@
                 <div class="stock-info">
                     Current: {{ product.current_qty }} &nbsp;|&nbsp; Threshold: {{ product.threshold }}
                 </div>
+                {% if product.variants %}
+                    <div class="variant-sizes">
+                        {% for variant in product.variants %}
+                            <span class="variant-chip{% if variant.inventory <= 0 %} low{% endif %}">{{ variant.title }}: {{ variant.inventory }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
         </div>
     {% else %}

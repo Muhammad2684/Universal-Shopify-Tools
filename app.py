@@ -865,12 +865,23 @@ def process_product_edges(edges):
         node        = edge['node']
         current_qty = node['variants']['edges'][0]['node']['inventoryQuantity'] if node['variants']['edges'] else 0
         threshold   = int(node['metafield']['value']) if node.get('metafield') else 0
+        
+        # Extract all variants with their titles (sizes) and inventory
+        variants = []
+        for variant_edge in node['variants']['edges']:
+            variant_node = variant_edge['node']
+            variants.append({
+                'title': variant_node.get('title', 'N/A'),
+                'inventory': variant_node['inventoryQuantity'],
+            })
+        
         processed.append({
             "product_id":  node['id'],
             "title":       node['title'],
             "image_url":   node['featuredImage']['url'] if node.get('featuredImage') else None,
             "current_qty": current_qty,
             "threshold":   threshold,
+            "variants":    variants,
         })
     return processed
 
@@ -1020,8 +1031,14 @@ def show_category(category_slug):
           node {{
             id title
             featuredImage {{ url }}
-            variants(first: 1) {{
-              edges {{ node {{ inventoryQuantity }} }}
+            variants(first: 250) {{
+              edges {{
+                node {{
+                  id
+                  title
+                  inventoryQuantity
+                }}
+              }}
             }}
             metafield(namespace: "{ns}", key: "{key}") {{
               value

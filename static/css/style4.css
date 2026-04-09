@@ -194,6 +194,29 @@ body {
     margin-top: auto;
 }
 
+.variant-sizes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+}
+
+.variant-chip {
+    font-size: 0.7em;
+    padding: 3px 7px;
+    background: var(--item-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-dark);
+    white-space: nowrap;
+}
+
+.variant-chip.low {
+    border-color: var(--accent-color);
+    color: var(--accent-color);
+    background: rgba(233, 69, 96, 0.1);
+}
+
 /* ── Empty state alert ───────────────────────────────────────────────────── */
 .empty-alert {
     background-color: var(--item-bg);
