@@ -264,6 +264,113 @@ body {
     margin-top: auto;
 }
 
+.product-comment {
+    font-size: 0.9em;
+    color: var(--text-light);
+    background: rgba(233, 69, 96, 0.1);
+    border: 1px solid rgba(233, 69, 96, 0.3);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+    line-height: 1.4;
+}
+
+.product-comment strong {
+    color: var(--accent-color);
+}
+
+.comment-display {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.comment-text {
+    flex: 1;
+    font-size: 0.9em;
+}
+
+.comment-edit-btn, .comment-add-btn {
+    background: none;
+    border: none;
+    color: var(--accent-color);
+    cursor: pointer;
+    font-size: 0.9em;
+    padding: 4px 6px;
+    border-radius: 3px;
+    transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.comment-edit-btn:hover, .comment-add-btn:hover {
+    background: rgba(233, 69, 96, 0.2);
+}
+
+.comment-edit-btn svg {
+    display: block;
+    flex-shrink: 0;
+}
+
+.comment-add-btn {
+    color: var(--text-dark);
+    font-style: italic;
+}
+
+.comment-edit {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.comment-input {
+    min-height: 80px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-light);
+    font-family: inherit;
+    font-size: 0.9em;
+    resize: vertical;
+}
+
+.comment-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.comment-actions {
+    display: flex;
+    gap: 6px;
+    justify-content: flex-end;
+}
+
+.comment-save-btn, .comment-cancel-btn {
+    padding: 6px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+    color: var(--text-light);
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.comment-save-btn {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.comment-save-btn:hover {
+    background: #d43d5d;
+}
+
+.comment-cancel-btn:hover {
+    background: var(--item-bg);
+}
+
 .variant-sizes {
     display: flex;
     flex-wrap: wrap;

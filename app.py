@@ -32,6 +32,7 @@ def SHOPIFY_ACCESS_TOKEN(): return active_creds["SHOPIFY_ACCESS_TOKEN"]
 def SHOPIFY_API_VERSION():  return active_creds["SHOPIFY_API_VERSION"]
 def METAFIELD_NAMESPACE():  return active_creds["METAFIELD_NAMESPACE"]
 def METAFIELD_KEY():        return active_creds["METAFIELD_KEY"]
+def STOCK_COMMENT_KEY():    return "stock_comment"
 
 def _apply_profile(p):
     active_creds["SHOPIFY_STORE_URL"]    = p["store_url"]
@@ -864,7 +865,8 @@ def process_product_edges(edges):
     for edge in (edges or []):
         node        = edge['node']
         current_qty = node['variants']['edges'][0]['node']['inventoryQuantity'] if node['variants']['edges'] else 0
-        threshold   = int(node['metafield']['value']) if node.get('metafield') else 0
+        threshold   = int(node.get('thresholdMetafield', {}).get('value', 0)) if node.get('thresholdMetafield') else 0
+        comment     = node.get('commentMetafield', {}).get('value', '') if node.get('commentMetafield') else ''
         
         # Extract all variants with their titles (sizes) and inventory
         variants = []
@@ -882,6 +884,7 @@ def process_product_edges(edges):
             "current_qty": current_qty,
             "threshold":   threshold,
             "variants":    variants,
+            "comment":     comment,
         })
     return processed
 
@@ -1009,6 +1012,8 @@ def show_urgent():
     stock_cats       = get_stock_categories_dict()
     all_tags         = [cat["tag"] for cat in get_stock_categories_dict().values()]
     tag_query_string = " OR ".join([f"tag:'{tag}'" for tag in all_tags])
+    ns               = METAFIELD_NAMESPACE()
+    comment_key      = STOCK_COMMENT_KEY()
     query = f"""
     {{
       products(first: 250, query: "({tag_query_string})") {{
@@ -1018,6 +1023,9 @@ def show_urgent():
             featuredImage {{ url }}
             variants(first: 1) {{
               edges {{ node {{ inventoryQuantity }} }}
+            }}
+            commentMetafield: metafield(namespace: "{ns}", key: "{comment_key}") {{
+              value
             }}
           }}
         }}
@@ -1033,16 +1041,18 @@ def show_urgent():
                 qty = node['variants']['edges'][0]['node']['inventoryQuantity']
                 if qty < 0:
                     products_to_display.append({
+                        "product_id": node['id'],
                         "title":       node['title'],
                         "image_url":   node['featuredImage']['url'] if node.get('featuredImage') else None,
                         "current_qty": qty,
-                        "needed_qty":  0 - qty
+                        "needed_qty":  0 - qty,
+                        "comment":     node.get('commentMetafield', {}).get('value', '') if node.get('commentMetafield') else ''
                     })
     sorted_products = sorted(products_to_display, key=lambda p: p['needed_qty'], reverse=True)
     return render_template('urgent_page.html', products=sorted_products, page_title="Urgent",
                            active_page='stock', active_stock='urgent')
 
-@app.route('/stock/<category_slug>')
+@app.route('/stock/<category_slug>' )
 def show_category(category_slug):
     if category_slug == 'manage':
         return manage_categories()
@@ -1055,6 +1065,7 @@ def show_category(category_slug):
     tag = category["tag"]
     ns  = METAFIELD_NAMESPACE()
     key = METAFIELD_KEY()
+    comment_key = STOCK_COMMENT_KEY()
     query = f"""
     {{
       products(first: 250, query: "tag:'{tag}'") {{
@@ -1071,7 +1082,10 @@ def show_category(category_slug):
                 }}
               }}
             }}
-            metafield(namespace: "{ns}", key: "{key}") {{
+            thresholdMetafield: metafield(namespace: "{ns}", key: "{key}") {{
+              value
+            }}
+            commentMetafield: metafield(namespace: "{ns}", key: "{comment_key}") {{
               value
             }}
           }}
@@ -1155,6 +1169,54 @@ def update_threshold():
         if errors:
             return jsonify({'success': False, 'error': errors[0]['message']}), 400
         return jsonify({'success': True, 'new_value': new_value})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/update_stock_comment', methods=['POST'])
+def update_stock_comment():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body       = request.get_json(silent=True) or {}
+    product_id = body.get('product_id', '').strip()
+    comment    = body.get('comment', '')
+
+    if not product_id:
+        return jsonify({'success': False, 'error': 'product_id required'}), 400
+
+    ns          = METAFIELD_NAMESPACE()
+    comment_key = STOCK_COMMENT_KEY()
+
+    mutation = """
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { key namespace value }
+        userErrors  { field message }
+      }
+    }
+    """
+    variables = {
+        "metafields": [{
+            "ownerId":   product_id,
+            "namespace": ns,
+            "key":       comment_key,
+            "value":     str(comment),
+            "type":      "multi_line_text_field"
+        }]
+    }
+
+    try:
+        resp = requests.post(
+            get_graphql_url(),
+            headers=get_headers(),
+            json={"query": mutation, "variables": variables}
+        )
+        resp.raise_for_status()
+        data   = resp.json()
+        errors = data.get('data', {}).get('metafieldsSet', {}).get('userErrors', [])
+        if errors:
+            return jsonify({'success': False, 'error': errors[0]['message']}), 400
+        return jsonify({'success': True, 'comment': comment})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
         
