@@ -114,7 +114,7 @@ def credentials_ok():
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-APP_VERSION = "1.1.7"
+APP_VERSION = "1.1.8"
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
 
 _update_state = {"status": "idle", "percent": 0, "error": ""}
@@ -1428,16 +1428,16 @@ def search_products():
         results = []
         for edge in data.get('data', {}).get('products', {}).get('edges', []):
             node       = edge['node']
-            title      = node['title']
+            title      = node.get('title') or 'Unknown Product'
             img        = node['featuredImage']['url'] if node.get('featuredImage') else None
             # Extract numeric ID from GID e.g. "gid://shopify/Product/123" -> "123"
             numeric_id = node['id'].split('/')[-1]
             for v in node['variants']['edges']:
                 vnode         = v['node']
-                sku           = vnode.get('sku', '').strip()
+                sku           = (vnode.get('sku') or '').strip()
                 if not sku:
                     continue
-                variant_title = vnode.get('title', '')
+                variant_title = vnode.get('title') or ''
                 display       = title if variant_title in ('Default Title', '') else f"{title} — {variant_title}"
                 results.append({
                     'sku':        sku,

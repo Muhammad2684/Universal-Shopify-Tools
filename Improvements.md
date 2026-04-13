@@ -14,7 +14,7 @@
 
 
 
-##### Mark as Paid improvements
+##### Mark as Paid:
 
 
 
@@ -22,7 +22,7 @@
 
 
 
-##### My Accountant improvements
+##### My Accountant:
 
 
 
@@ -31,21 +31,23 @@
 
 
 
-##### Stock App improvements
+##### Stock App:
 
 
 
 * ~~Editable thresholds directly in the UI instead of going to Shopify metafields~~
 * ~~Feature to add categories within app UI~~
 * ~~Display Skipped Orders on Top in CSV modal~~
-* ~~Gerayed Products~~
+* ~~Instock Products~~
 * ~~Product Sizes under browse products~~
 * ~~Subcategories~~
 * No product image
+* ~~Product comments~~
+* 
 
 
 
-##### QTY Deduction
+##### QTY Deduction:
 
 
 
@@ -54,13 +56,21 @@
 
 
 
-##### Scan and Pack
+##### Scan and Pack:
 
 
 
 * ~~Order notes in SAP — button under order details, opens popup to add Shopify order notes (Red box), shows existing notes (Green box)\[refer to reference image for box locations]~~
 * ~~Packed list search — by order number, date, and note content~~
-* Highlight special instructions
+* ~~Highlight special instructions~~
+
+
+
+#### PDF Generator:
+
+
+
+
 
 
 
@@ -70,5 +80,7 @@
 
 * ~~Browse products fix~~
 * ~~Removed/replaced item ghost bug — when an order is edited in Shopify (item removed or replaced), SAP and MAR still show both the old and new line items instead of only the current ones~~
-* Error: 'NoneType' object has no attribute 'strip'
+* ~~Error: 'NoneType' object has no attribute 'strip'~~
+* ~~Remove "Default Title"~~
+* Access Parent Category 
 

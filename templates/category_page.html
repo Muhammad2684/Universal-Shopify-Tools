@@ -59,7 +59,7 @@
                         </div>
                     </div>
                 {% endif %}
-                {% if product.variants %}
+                {% if product.variants and product.variants|length > 1 %}
                     <div class="variant-sizes">
                         {% for variant in product.variants %}
                             <span class="variant-chip{% if variant.inventory <= 0 %} low{% endif %}">{{ variant.title }}: {{ variant.inventory }}</span>

@@ -299,7 +299,7 @@ kbd {
     display: none;
     margin-top: 8px; margin-bottom: 4px;
     padding: 7px 12px;
-    background: rgba(40,167,69,0.08);
+    background: #28a745;
     border: 1px solid rgba(40,167,69,0.4);
     border-radius: 7px;
     font-size: 0.88em; color: var(--text-light);
@@ -310,7 +310,7 @@ kbd {
 .order-notes-display .notes-label {
     font-size: 0.72em; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.06em;
-    color: #28a745; white-space: nowrap; flex-shrink: 0;
+    color: var(--text-light); white-space: nowrap; flex-shrink: 0;
 }
 
 /* ── Notes popup overlay ── */

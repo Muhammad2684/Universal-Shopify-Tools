@@ -201,17 +201,16 @@ body {
 }
 
 .product-card.above-threshold {
-    opacity: 0.45;
-    filter: grayscale(100%);
+    border-color: #22c55e;
 }
 
 .product-card.above-threshold:hover {
-    transform: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 .product-card.above-threshold .product-card-body h5 {
-    color: var(--text-dark);
+    color: var(--text-light);
 }
 
 .category-divider {
@@ -255,6 +254,13 @@ body {
     font-size: 1.4em;
     font-weight: bold;
     color: var(--accent-color);
+    margin: 4px 0;
+}
+
+.stock-ok {
+    font-size: 1.4em;
+    font-weight: bold;
+    color: #22c55e;
     margin: 4px 0;
 }
 
