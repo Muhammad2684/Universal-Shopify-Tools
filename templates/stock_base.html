@@ -34,6 +34,9 @@
     <header class="app-header">
         <h1>Stock App</h1>
     </header>
+    
+    <!-- Page loading bar -->
+    <div class="page-loading-bar" id="loadingBar"></div>
 
     <main class="app-main">
         <nav class="stock-nav" id="stockNav">
@@ -55,11 +58,7 @@
     // Inject dynamic category links into nav with subcategory dropdown support
     (function() {
         var activeStock = "{{ active_stock }}";
-        var containers = [];
-
-        function closeAll() {
-            containers.forEach(function(c) { c.classList.remove('open'); });
-        }
+        var dropdownTimeouts = {};
 
         function initDropdowns(cats) {
             var nav  = document.getElementById('stockNav');
@@ -99,14 +98,17 @@
                     });
                     container.appendChild(subNav);
                     nav.insertBefore(container, manageLink);
-                    containers.push(container);
 
-                    // Click trigger to toggle
-                    a.addEventListener('click', function(e) {
-                        e.preventDefault();
-                        var wasOpen = container.classList.contains('open');
-                        closeAll();
-                        if (!wasOpen) container.classList.add('open');
+                    // Add hover delay logic
+                    var timeoutId = null;
+                    container.addEventListener('mouseenter', function() {
+                        if (timeoutId) clearTimeout(timeoutId);
+                        container.classList.add('hovering');
+                    });
+                    container.addEventListener('mouseleave', function() {
+                        timeoutId = setTimeout(function() {
+                            container.classList.remove('hovering');
+                        }, 100);
                     });
                 } else {
                     var a = document.createElement('a');
@@ -118,16 +120,6 @@
             });
         }
 
-        // Close on outside click
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.cat-sub-container')) closeAll();
-        });
-
-        // Close on outside click
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.cat-sub-container')) closeAll();
-        });
-
         // Init once categories are ready
         async function init() {
             try {
@@ -137,6 +129,39 @@
             } catch(e) {}
         }
         init();
+    })();
+
+    // Page loading bar on navigation
+    (function() {
+        const loadingBar = document.getElementById('loadingBar');
+        if (!loadingBar) return;
+        
+        let loadingTimeout = null;
+
+        // Show loading bar on any link click
+        document.addEventListener('click', function(e) {
+            const link = e.target.closest('a');
+            if (link && !link.hasAttribute('onclick') && link.getAttribute('target') !== '_blank') {
+                // Skip anchor links
+                if (!link.href.includes('#')) {
+                    loadingBar.classList.remove('active');
+                    // Force reflow to restart animation
+                    void loadingBar.offsetWidth;
+                    loadingBar.classList.add('active');
+                    
+                    // Auto-hide after 2.5 seconds
+                    clearTimeout(loadingTimeout);
+                    loadingTimeout = setTimeout(function() {
+                        loadingBar.classList.remove('active');
+                    }, 2500);
+                }
+            }
+        });
+
+        // Hide when page loads
+        window.addEventListener('load', function() {
+            loadingBar.classList.remove('active');
+        });
     })();
 
     // Product comment editing functions

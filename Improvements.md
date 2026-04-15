@@ -11,6 +11,7 @@
 * ~~Keyboard shortcut to confirm/mark order without clicking the button — scan flow should be entirely hands-free~~
 * ~~Sound feedback on successful pack/return — a short beep so the operator doesn't have to look at the screen~~
 * ~~Pay wall~~
+* Loading Bar
 
 
 
@@ -28,6 +29,7 @@
 
 * ~~The "Add to Accountant" batch button from Scan \& Pack and Mark as Returned~~
 * ~~Filter by Date button to open calendar to select date when viewing entries for a specific day~~
+* Settings Tab
 
 
 
@@ -43,7 +45,10 @@
 * ~~Subcategories~~
 * No product image
 * ~~Product comments~~
-* 
+* Product selection
+* Image Folder
+
+
 
 
 
@@ -72,7 +77,7 @@
 
 
 
-
+#### Mobile Version:
 
 
 
@@ -82,5 +87,5 @@
 * ~~Removed/replaced item ghost bug — when an order is edited in Shopify (item removed or replaced), SAP and MAR still show both the old and new line items instead of only the current ones~~
 * ~~Error: 'NoneType' object has no attribute 'strip'~~
 * ~~Remove "Default Title"~~
-* Access Parent Category 
+* ~~Access Parent Category~~
 

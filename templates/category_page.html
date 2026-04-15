@@ -14,7 +14,7 @@
             {% set ns.divider_inserted = true %}
         {% endif %}
         <div class="product-card{% if product.above_threshold %} above-threshold{% endif %}">
-            <img src="{{ product.image_url if product.image_url else 'https://via.placeholder.com/300/1a1a2e/e94560?text=No+Image' }}"
+            <img src="{{ product.image_url if product.image_url else url_for('static', filename='icons/Icon.png') }}"
                  alt="{{ product.title }}">
             <div class="product-card-body">
                 <h5>{{ product.title }}</h5>

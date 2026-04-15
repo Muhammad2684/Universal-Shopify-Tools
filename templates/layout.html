@@ -5,6 +5,40 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>My Flask App</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    /* ── Page Loading Bar ─────────────────────────────────────────────────────── */
+    .page-loading-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 8px;
+        background: #e94560;
+        opacity: 0;
+        z-index: 99999;
+        box-shadow: 0 2px 10px rgba(233, 69, 96, 0.8);
+    }
+
+    .page-loading-bar.active {
+        opacity: 1 !important;
+        animation: bar-load 2s ease-in-out;
+    }
+
+    @keyframes bar-load {
+        0% { 
+            transform: scaleX(0);
+            transform-origin: left;
+        }
+        50% { 
+            transform: scaleX(0.7);
+            transform-origin: left;
+        }
+        100% { 
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+    }
+  </style>
 </head>
 
 {% macro show_flash_messages() %}
@@ -30,6 +64,9 @@
 {% endmacro %}
 
 <body>
+  <!-- Page loading bar -->
+  <div class="page-loading-bar" id="loadingBar"></div>
+  
   <!-- Page Content -->
   {% block content %}{% endblock %}
 </body>
@@ -38,4 +75,39 @@
 <footer class="app-footer">
   {% include 'navigation.html' %}
 </footer>
+
+<script>
+  // Page loading bar on all page navigation
+  (function() {
+    const loadingBar = document.getElementById('loadingBar');
+    if (!loadingBar) return;
+    
+    let loadingTimeout = null;
+
+    // Show loading bar on any link click
+    document.addEventListener('click', function(e) {
+      const link = e.target.closest('a');
+      if (link && !link.hasAttribute('onclick') && link.getAttribute('target') !== '_blank') {
+        // Skip anchor links
+        if (!link.href.includes('#')) {
+          loadingBar.classList.remove('active');
+          // Force reflow to restart animation
+          void loadingBar.offsetWidth;
+          loadingBar.classList.add('active');
+          
+          // Auto-hide after 2.5 seconds
+          clearTimeout(loadingTimeout);
+          loadingTimeout = setTimeout(function() {
+            loadingBar.classList.remove('active');
+          }, 2500);
+        }
+      }
+    });
+
+    // Hide when page loads
+    window.addEventListener('load', function() {
+      loadingBar.classList.remove('active');
+    });
+  })();
+</script>
 </html>
