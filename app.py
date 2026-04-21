@@ -49,7 +49,7 @@ def _clear_creds():
     active_creds["METAFIELD_KEY"]        = ""
 
 PROFILES_FILE = os.path.join(BASE_DIR, 'profiles.json')
-LICENSE_SERVER = "https://web-production-24ac0.up.railway.app"
+LICENSE_SERVER = "https://usht.pythonanywhere.com"
 LICENSE_FILE   = os.path.join(BASE_DIR, 'license.json')
 
 def boot_active_profile():
