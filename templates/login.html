@@ -1,14 +1,14 @@
 {% extends "layout.html" %}
 
 {% block content %}
-<body style="overflow: hidden;"></body>
+<body style="overflow: hidden;">
 
     <header class="app-header">
         <h1>Login</h1>
     </header>
 
     {{ show_flash_messages() }}
-    
+
    <div style="position: absolute; top: 180px; left: 50%; transform: translateX(-50%);">
         <form method="post" action="{{ url_for('login') }}">
             <div class="container">
@@ -28,4 +28,5 @@
             </div>
         </form>
     </div>
+</body>
 {% endblock %}

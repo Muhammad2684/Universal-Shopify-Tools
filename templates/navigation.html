@@ -724,5 +724,11 @@ async function checkForUpdate() {
 }
 
 loadPlanBadge();
+
+async function applyNavPermissions() {
+    // No longer hiding links by default. 
+    // They will remain visible but clicking them will result in 403 redirect if unauthorized.
+}
+applyNavPermissions();
 })();
-</script>
+</script>

@@ -52,6 +52,20 @@ PROFILES_FILE = os.path.join(BASE_DIR, 'profiles.json')
 LICENSE_SERVER = "https://usht.pythonanywhere.com"
 LICENSE_FILE   = os.path.join(BASE_DIR, 'license.json')
 
+ROUTE_PERMISSIONS = {
+    '/scanpack':         'has_sap',
+    '/api/get_order':    'has_sap',
+    '/api/fulfill_order': 'has_sap',
+    '/markpaid':         'has_map',
+    '/api/tag_order':    'has_map',
+    '/api/mark_paid_batch': 'has_map',
+    '/returned':         'has_mar',
+    '/stock':            'has_stock_app',
+    '/api/dashboard':    None, # Special handling for dashboard
+    '/deduct':           'has_qty_deduction',
+    '/accountant':       'has_accountant',
+}
+
 def boot_active_profile():
     if not os.path.exists(PROFILES_FILE):
         print("[STARTUP] No profiles.json found — waiting for user to add a profile.")
@@ -470,15 +484,28 @@ def check_license():
             return redirect('/license')
         # Update local license with latest info (including free_trial flag)
         save_license({
-            'key':        lic['key'],
-            'plan':       data['plan'],
-            'label':      data['label'],
-            'expires_at': data.get('expires_at'),
-            'customer':   data.get('customer', ''),
-            'free_trial': data.get('free_trial', False),
+            'key':         lic['key'],
+            'plan':        data['plan'],
+            'label':       data['label'],
+            'expires_at':  data.get('expires_at'),
+            'customer':    data.get('customer', ''),
+            'free_trial':  data.get('free_trial', False),
+            'permissions': data.get('permissions', {}),
         })
     except Exception:
         pass  # Server unreachable — allow through (offline tolerance)
+
+    # ── Enforce Permissions ───────────────────────────────────────────
+    permissions = lic.get('permissions', {})
+    path = request.path
+    for route, flag in ROUTE_PERMISSIONS.items():
+        if path.startswith(route) and flag:
+            if permissions.get(flag) == False:
+                return redirect('/403')
+
+@app.route('/403')
+def forbidden():
+    return render_template('403.html')
 
 @app.route('/license')
 def license_page():
@@ -497,12 +524,13 @@ def license_validate():
         data = resp.json()
         if data.get('valid'):
             save_license({
-                'key':        key,
-                'plan':       data['plan'],
-                'label':      data['label'],
-                'expires_at': data.get('expires_at'),
-                'customer':   data.get('customer', ''),
-                'free_trial': data.get('free_trial', False),
+                'key':         key,
+                'plan':        data['plan'],
+                'label':       data['label'],
+                'expires_at':  data.get('expires_at'),
+                'customer':    data.get('customer', ''),
+                'free_trial':  data.get('free_trial', False),
+                'permissions': data.get('permissions', {}),
             })
         return jsonify(data)
     except Exception:
@@ -524,6 +552,18 @@ def license_status():
         'label':      lic['label'],
         'free_trial': lic.get('free_trial', False),
     })
+
+@app.route('/api/license/permissions', methods=['GET'])
+def license_permissions():
+    lic = load_license()
+    if not lic or 'permissions' not in lic:
+        # Default all to True if not yet set or no license
+        defaults = {
+            'has_sap': True, 'has_map': True, 'has_mar': True,
+            'has_qty_deduction': True, 'has_accountant': True, 'has_stock_app': True
+        }
+        return jsonify(lic.get('permissions', defaults) if lic else defaults)
+    return jsonify(lic['permissions'])
 
 @app.route('/')
 def home():

@@ -11,7 +11,7 @@
 * ~~Keyboard shortcut to confirm/mark order without clicking the button — scan flow should be entirely hands-free~~
 * ~~Sound feedback on successful pack/return — a short beep so the operator doesn't have to look at the screen~~
 * ~~Pay wall~~
-* Loading Bar
+* ~~Loading Bar~~
 
 
 
@@ -43,7 +43,7 @@
 * ~~Instock Products~~
 * ~~Product Sizes under browse products~~
 * ~~Subcategories~~
-* No product image
+* ~~No product image~~
 * ~~Product comments~~
 * Product selection
 * Image Folder
@@ -88,4 +88,5 @@
 * ~~Error: 'NoneType' object has no attribute 'strip'~~
 * ~~Remove "Default Title"~~
 * ~~Access Parent Category~~
+* Full Order No. Input
 

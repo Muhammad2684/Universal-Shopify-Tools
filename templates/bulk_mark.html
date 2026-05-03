@@ -117,12 +117,51 @@
         /* ── City column (hidden by default, shown via JS) ── */
         .col-city { display: none; min-width: 100px; }
         .col-amount { min-width: 120px; text-align: right; }
+
+/* ── Context Menu Styles ── */
+.context-menu {
+    position: absolute;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    padding: 5px 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    border-radius: 4px;
+}
+.context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.context-menu li a {
+    display: block;
+    padding: 8px 15px;
+    text-decoration: none;
+    color: var(--text-light);
+    transition: background 0.2s ease;
+}
+.context-menu li a:hover {
+    background: var(--accent-color);
+    color: var(--button-text);
+}
     </style>
 </head>
 <body class="app">
 
 <!-- Page loading bar -->
 <div class="page-loading-bar" id="loadingBar"></div>
+
+<!-- Custom Context Menu -->
+<div id="context-menu" class="context-menu">
+  <ul>
+    <li><a href="#" onclick="location.reload(); return false;">Refresh Page</a></li>
+    <li><a href="#" onclick="history.back(); return false;">Go Back</a></li>
+    <li><a href="#" onclick="history.forward(); return false;">Go Forward</a></li>
+  </ul>
+</div>
 
     <div class="app-header">
         <h1 style="text-align:center;">Bulk Mark as Paid</h1>
@@ -204,6 +243,26 @@
     <div class="app-footer">
         {% include "navigation.html" %}
     </div>
+
+    <!-- Custom Right-Click Menu Script -->
+    <script>
+    (function() {
+      const contextMenu = document.getElementById('context-menu');
+
+      document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        contextMenu.style.left = e.pageX + 'px';
+        contextMenu.style.top = e.pageY + 'px';
+        contextMenu.style.opacity = '1';
+        contextMenu.style.visibility = 'visible';
+      });
+
+      document.addEventListener('click', function() {
+        contextMenu.style.opacity = '0';
+        contextMenu.style.visibility = 'hidden';
+      });
+    })();
+    </script>
 
     <script src="{{ url_for('static', filename='js/main2.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

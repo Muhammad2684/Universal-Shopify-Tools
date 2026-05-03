@@ -130,9 +130,49 @@ body {
     color: #555;
     text-align: center;
 }
+
+/* ── Context Menu Styles ── */
+.context-menu {
+    position: absolute;
+    background: #0f0f1d;
+    border: 1px solid #33334d;
+    box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
+    z-index: 1000;
+    padding: 5px 0;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+    border-radius: 4px;
+}
+.context-menu ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.context-menu li a {
+    display: block;
+    padding: 8px 15px;
+    text-decoration: none;
+    color: #e0e0e0;
+    transition: background 0.2s ease;
+}
+.context-menu li a:hover {
+    background: #e94560;
+    color: #ffffff;
+}
 </style>
 </head>
 <body>
+
+<!-- Custom Context Menu -->
+<div id="context-menu" class="context-menu">
+  <ul>
+    <li><a href="#" onclick="location.reload(); return false;">Refresh Page</a></li>
+    <li><a href="#" onclick="history.back(); return false;">Go Back</a></li>
+    <li><a href="#" onclick="history.forward(); return false;">Go Forward</a></li>
+  </ul>
+</div>
+
 <div class="license-wrap">
 
     <div class="logo-area">
@@ -157,6 +197,26 @@ body {
 
     <p class="footer-note">Contact support on WhatsApp if you need help with your license key.</p>
 </div>
+
+<!-- Custom Right-Click Menu Script -->
+<script>
+(function() {
+  const contextMenu = document.getElementById('context-menu');
+
+  document.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    contextMenu.style.left = e.pageX + 'px';
+    contextMenu.style.top = e.pageY + 'px';
+    contextMenu.style.opacity = '1';
+    contextMenu.style.visibility = 'visible';
+  });
+
+  document.addEventListener('click', function() {
+    contextMenu.style.opacity = '0';
+    contextMenu.style.visibility = 'hidden';
+  });
+})();
+</script>
 
 <script>
 async function activate() {
