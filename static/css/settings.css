@@ -1,0 +1,372 @@
+/* ── Settings Toggle Icon (in nav bar) ───────────────────────────────────── */
+.nav-settings-toggle {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #b0b0b0;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
+}
+.nav-settings-toggle:hover {
+    color: #e94560;
+    background: rgba(233, 69, 96, 0.12);
+}
+.nav-settings-toggle svg {
+    width: 18px;
+    height: 18px;
+}
+
+/* ── Settings Modal Overlay ───────────────────────────────────────────────── */
+.settings-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+}
+.settings-overlay.open { display: flex; }
+
+/* ── Settings Window ──────────────────────────────────────────────────────── */
+.settings-window {
+    background: #0f0f1d;
+    border: 1px solid #33334d;
+    border-radius: 14px;
+    width: 860px;
+    height: 540px;
+    max-width: 95vw;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+    animation: settingsPop 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes settingsPop {
+    from { transform: scale(0.95) translateY(8px); opacity: 0; }
+    to   { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+/* ── Header Bar ───────────────────────────────────────────────────────────── */
+.sw-header {
+    height: 44px;
+    background: #0f0f1d;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-bottom: 1px solid #33334d;
+    flex-shrink: 0;
+}
+.sw-title {
+    font-size: 12px;
+    color: #888;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+.sw-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 44px;
+    width: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: #888;
+    font-size: 1.2em;
+    transition: background 0.2s, color 0.2s;
+    border-top-right-radius: 14px;
+}
+.sw-close:hover { background: #e94560; color: #fff; }
+
+/* ── Main Layout ──────────────────────────────────────────────────────────── */
+.sw-main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+.sw-sidebar {
+    width: 210px;
+    background: #0f0f1d;
+    border-right: 1px solid #33334d;
+    padding: 16px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+.sw-sidebar-group {
+    font-size: 10px;
+    font-weight: 700;
+    color: #44446b;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin: 14px 10px 6px;
+}
+.sw-nav-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: #b0b0b0;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sw-nav-item:hover  { background: #1a1a2e; color: #e0e0e0; }
+.sw-nav-item.active { background: rgba(233,69,96,0.12); color: #e94560; }
+
+/* ── Content Area ─────────────────────────────────────────────────────────── */
+.sw-content {
+    flex: 1;
+    background: #0d0d1a;
+    padding: 28px 36px;
+    overflow-y: auto;
+}
+.sw-tab-content { display: none; }
+.sw-tab-content.active {
+    display: block;
+    animation: swFadeIn 0.18s ease;
+}
+@keyframes swFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.sw-section-header {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #44446b;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+}
+
+/* ── Cards ────────────────────────────────────────────────────────────────── */
+.sw-card {
+    background: #1a1a2e;
+    border: 1px solid #33334d;
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.sw-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 20px;
+}
+.sw-info { flex: 1; }
+.sw-info h4 { margin: 0 0 4px; color: #e0e0e0; font-size: 13.5px; font-weight: 600; }
+.sw-info p  { margin: 0; color: #888; font-size: 12px; line-height: 1.55; }
+
+/* ── Toggle Switch ────────────────────────────────────────────────────────── */
+.sw-switch {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+    flex-shrink: 0;
+}
+.sw-switch input { opacity: 0; width: 0; height: 0; }
+.sw-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #33334d;
+    transition: 0.3s;
+    border-radius: 34px;
+}
+.sw-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 4px;
+    bottom: 4px;
+    background-color: #b0b0b0;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+input:checked + .sw-slider              { background-color: #e94560; }
+input:checked + .sw-slider:before       { transform: translateX(20px); background-color: #fff; }
+
+/* ── Select/Action Buttons ────────────────────────────────────────────────── */
+.sw-select-btn {
+    background: #1a1a2e;
+    border: 1px solid #33334d;
+    color: #b0b0b0;
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 12.5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    min-width: 120px;
+    justify-content: space-between;
+    white-space: nowrap;
+}
+.sw-select-btn:hover { border-color: #e94560; color: #e94560; }
+.sw-select-btn svg { width: 12px; opacity: 0.5; }
+
+/* ── Accent Button ────────────────────────────────────────────────────────── */
+.sw-btn-accent {
+    background: #e94560;
+    border-color: #e94560;
+    color: #fff;
+    font-weight: 600;
+}
+.sw-btn-accent:hover { background: #c73652; border-color: #c73652; color: #fff; }
+
+/* ── Plan Badge ───────────────────────────────────────────────────────────── */
+.sw-plan-badge {
+    padding: 4px 14px;
+    background: rgba(233,69,96,0.12);
+    border: 1px solid rgba(233,69,96,0.35);
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #e94560;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    align-self: center;
+}
+
+/* ── Value Text ───────────────────────────────────────────────────────────── */
+.sw-value-text {
+    color: #e0e0e0;
+    font-size: 12.5px;
+    font-weight: 600;
+    align-self: center;
+    white-space: nowrap;
+}
+
+/* ── Profiles Tab ─────────────────────────────────────────────────────────── */
+.sw-profiles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+.sw-profile-card {
+    background: #1a1a2e;
+    border: 1px solid #33334d;
+    border-radius: 10px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: border-color 0.2s;
+}
+.sw-profile-card.active-profile { border-color: #e94560; }
+.sw-profile-card-info { flex: 1; min-width: 0; }
+.sw-profile-card-name {
+    font-weight: 600;
+    color: #e0e0e0;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.sw-profile-card-url {
+    font-size: 11.5px;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+}
+.sw-profile-active-badge {
+    font-size: 10px;
+    background: #e94560;
+    color: #fff;
+    padding: 2px 9px;
+    border-radius: 10px;
+    white-space: nowrap;
+    font-weight: 600;
+}
+.sw-profile-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.sw-profile-btn {
+    background: none;
+    border: 1px solid #33334d;
+    color: #b0b0b0;
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.sw-profile-btn:hover           { border-color: #e94560; color: #e94560; }
+.sw-profile-btn.sw-activate     { border-color: #28a745; color: #28a745; }
+.sw-profile-btn.sw-activate:hover { background: #28a745; color: #fff; }
+.sw-profile-btn.sw-del:hover    { background: #e94560; color: #fff; border-color: #e94560; }
+
+.sw-pm-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: #0f0f1d;
+    border: 1px solid #33334d;
+    border-radius: 6px;
+    color: #e0e0e0;
+    font-size: 12.5px;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+.sw-pm-input:focus { outline: none; border-color: #e94560; }
+.sw-pm-input::placeholder { color: #44446b; }
+
+.sw-add-status { font-size: 11.5px; min-height: 16px; margin-top: 2px; }
+.sw-add-status.ok  { color: #28a745; }
+.sw-add-status.err { color: #e94560; }
+
+.sw-profile-edit-form {
+    background: #0f0f1d;
+    border: 1px solid #e94560;
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.sw-edit-actions { display: flex; gap: 8px; margin-top: 4px; }
+.sw-btn-save-edit {
+    padding: 7px 16px;
+    background: #28a745;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: filter 0.2s;
+}
+.sw-btn-save-edit:hover { filter: brightness(1.1); }
+.sw-btn-cancel-edit {
+    padding: 7px 16px;
+    background: none;
+    color: #b0b0b0;
+    border: 1px solid #33334d;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s;
+}
+.sw-btn-cancel-edit:hover { border-color: #e94560; color: #e94560; }

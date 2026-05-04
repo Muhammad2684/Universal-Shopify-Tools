@@ -162,33 +162,6 @@
     .btn-update-now:hover   { filter: brightness(1.1); }
     .btn-update-now:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
 
-    /* ── Store switcher floating button ── */
-    .store-fab {
-        position: fixed;
-        bottom: 70px;
-        right: 20px;
-        z-index: 999;
-        background-color: #e94560;
-        color: #fff;
-        border: none;
-        border-radius: 50px;
-        padding: 10px 16px;
-        font-size: 0.85em;
-        font-weight: bold;
-        cursor: pointer;
-        box-shadow: 0 4px 14px rgba(233,69,96,0.5);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        transition: transform 0.2s, filter 0.2s;
-    }
-    .store-fab:hover { filter: brightness(1.15); transform: translateY(-2px); }
-    .store-fab .fab-store-name {
-        max-width: 140px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
 
     /* ── Profiles modal overlay ── */
     .profiles-overlay {
@@ -304,7 +277,11 @@
     .plan-nav-badge.PRO      { background: rgba(192,132,252,0.15); color: #c084fc;  border: 1px solid rgba(192,132,252,0.3); }
     .plan-nav-badge.LIFETIME { background: rgba(34,197,94,0.15);   color: #22c55e;  border: 1px solid rgba(34,197,94,0.3); }
     .plan-nav-badge.FREE_TRIAL { background: rgba(249,115,22,0.15); color: #f97316; border: 1px solid rgba(249,115,22,0.3); }
+
 </style>
+
+<!-- Settings CSS -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/settings.css') }}">
 
 <nav>
     <div class="nav-links">
@@ -321,7 +298,18 @@
              onclick="openUpdateModal()"></div>
     </div>
     <span class="plan-nav-badge" id="planNavBadge"></span>
+
+    <!-- Settings Toggle Icon -->
+    <div class="nav-settings-toggle" onclick="openSettingsModal()" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2 2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+    </div>
 </nav>
+
+<!-- External Settings Modal Template -->
+{% include 'settings_modal.html' %}
 
 <!-- Update modal -->
 <div class="update-overlay" id="updateOverlay">
@@ -346,39 +334,8 @@
     </div>
 </div>
 
-<!-- Floating store switcher -->
-<button class="store-fab" onclick="openProfilesModal()">
-    <span class="fab-store-name" id="fabStoreName">Loading...</span>
-</button>
 
-<!-- Profiles modal -->
-<div class="profiles-overlay" id="profilesOverlay" onclick="handleOverlayClick(event)">
-    <div class="profiles-modal">
-        <div class="pm-header">
-            <h2>Store Profiles</h2>
-            <button class="pm-close" onclick="closeProfilesModal()">&#x2715;</button>
-        </div>
-        <div class="pm-body">
-            <div id="profilesList"></div>
-            <hr class="pm-divider">
-            <div class="pm-section-title">Add New Profile</div>
-            <div class="pm-form-grid">
-                <input class="pm-input" id="newName"    placeholder="Profile name (e.g. Main Store)">
-                <input class="pm-input" id="newUrl"     placeholder="Store URL (e.g. your-store.myshopify.com)">
-                <input class="pm-input" id="newToken"   placeholder="Access Token" type="password">
-                <div class="pm-row">
-                    <input class="pm-input" id="newVersion" placeholder="API Version (e.g. 2024-07)">
-                </div>
-                <div class="pm-row">
-                    <input class="pm-input" id="newNs"  placeholder="Metafield Namespace">
-                    <input class="pm-input" id="newKey" placeholder="Metafield Key">
-                </div>
-                <button class="btn-add-profile" onclick="addProfile()">+ Add Profile</button>
-                <div class="pm-status" id="addStatus"></div>
-            </div>
-        </div>
-    </div>
-</div>
+
 
 
 <script>
@@ -483,252 +440,81 @@
     };
 
     // ── Check for update on page load ───────────────────────────────────────
-async function checkForUpdate() {
-    // Only check once per session
-    if (sessionStorage.getItem('update_checked')) {
-        // Restore dot state if update was found earlier
-        if (sessionStorage.getItem('update_available') === 'true') {
-            _downloadUrl   = sessionStorage.getItem('update_download_url') || '';
-            _remoteVersion = sessionStorage.getItem('update_remote_version') || '';
-            document.getElementById('updateDot').classList.add('visible');
-            document.getElementById('updateVersionLine').textContent =
-                'Current: v' + (sessionStorage.getItem('update_current_version') || '') +
-                '   →   New: v' + _remoteVersion;
-            document.getElementById('updateNotes').textContent =
-                sessionStorage.getItem('update_notes') || 'No release notes.';
-            if (!_downloadUrl) {
-                document.getElementById('updateNowBtn').disabled = true;
-                setStatus('No download URL in version.json — update manually.', 'err');
+    async function checkForUpdate() {
+        if (sessionStorage.getItem('update_checked')) {
+            if (sessionStorage.getItem('update_available') === 'true') {
+                _downloadUrl   = sessionStorage.getItem('update_download_url') || '';
+                _remoteVersion = sessionStorage.getItem('update_remote_version') || '';
+                document.getElementById('updateDot').classList.add('visible');
+                document.getElementById('updateVersionLine').textContent =
+                    'Current: v' + (sessionStorage.getItem('update_current_version') || '') +
+                    '   →   New: v' + _remoteVersion;
+                document.getElementById('updateNotes').textContent =
+                    sessionStorage.getItem('update_notes') || 'No release notes.';
+                if (!_downloadUrl) {
+                    document.getElementById('updateNowBtn').disabled = true;
+                    setStatus('No download URL in version.json — update manually.', 'err');
+                }
             }
-        }
-        return;
-    }
-
-    // Mark as checked for this session
-    sessionStorage.setItem('update_checked', 'true');
-
-    try {
-        const res  = await fetch('/api/check_update');
-        const data = await res.json();
-
-        if (data.update_available) {
-            _downloadUrl   = data.download_url   || '';
-            _remoteVersion = data.remote_version || '';
-
-            // Store in session so other pages can restore state
-            sessionStorage.setItem('update_available',       'true');
-            sessionStorage.setItem('update_download_url',    _downloadUrl);
-            sessionStorage.setItem('update_remote_version',  _remoteVersion);
-            sessionStorage.setItem('update_current_version', data.current_version || '');
-            sessionStorage.setItem('update_notes',           data.notes || '');
-
-            document.getElementById('updateDot').classList.add('visible');
-
-            document.getElementById('updateVersionLine').textContent =
-                'Current: v' + data.current_version + '   →   New: v' + _remoteVersion;
-            document.getElementById('updateNotes').textContent =
-                data.notes || 'No release notes.';
-
-            if (!_downloadUrl) {
-                document.getElementById('updateNowBtn').disabled = true;
-                setStatus('No download URL in version.json — update manually.', 'err');
-            }
-
-            // Auto-open only on first check (first page load of the session)
-            openUpdateModal();
-        } else {
-            sessionStorage.setItem('update_available', 'false');
-        }
-    } catch (e) {
-        // Silent fail
-    }
-}
-    // ── Profiles ────────────────────────────────────────────────────────────
-    let profiles = [];
-    let activeId = null;
-
-    async function fetchProfiles() {
-        try {
-            const res  = await fetch('/api/profiles');
-            const data = await res.json();
-            profiles = data.profiles || [];
-            activeId = data.active;
-            renderProfiles();
-            updateFab();
-        } catch (e) {
-            document.getElementById('fabStoreName').textContent = 'No store';
-        }
-    }
-
-    function updateFab() {
-        const active = profiles.find(p => p.id === activeId);
-        document.getElementById('fabStoreName').textContent = active ? active.name : 'No store';
-    }
-
-    function renderProfiles() {
-        const container = document.getElementById('profilesList');
-        if (!profiles.length) {
-            container.innerHTML = '<div style="color:#b0b0b0;font-size:0.88em;text-align:center;padding:10px 0;">No profiles yet. Add one below.</div>';
             return;
         }
-        container.innerHTML = '';
-        profiles.forEach(p => {
-            const isActive = p.id === activeId;
-            const card = document.createElement('div');
-            card.className  = 'profile-card' + (isActive ? ' active-profile' : '');
-            card.dataset.id = p.id;
-            card.innerHTML  = `
-                <div class="profile-card-info">
-                    <div class="profile-card-name">${escHtml(p.name)}</div>
-                    <div class="profile-card-url">${escHtml(p.store_url)}</div>
-                </div>
-                ${isActive ? '<span class="profile-card-badge">Active</span>' : ''}
-                <div class="profile-actions">
-                    ${!isActive ? `<button class="btn-profile-action activate" onclick="activateProfile('${p.id}')">Switch</button>` : ''}
-                    <button class="btn-profile-action" onclick="editProfile('${p.id}')">Edit</button>
-                    <button class="btn-profile-action del" onclick="deleteProfile('${p.id}')">Del</button>
-                </div>
-            `;
-            container.appendChild(card);
-        });
+
+        sessionStorage.setItem('update_checked', 'true');
+
+        try {
+            const res  = await fetch('/api/check_update');
+            const data = await res.json();
+
+            if (data.update_available) {
+                _downloadUrl   = data.download_url   || '';
+                _remoteVersion = data.remote_version || '';
+
+                sessionStorage.setItem('update_available',       'true');
+                sessionStorage.setItem('update_download_url',    _downloadUrl);
+                sessionStorage.setItem('update_remote_version',  _remoteVersion);
+                sessionStorage.setItem('update_current_version', data.current_version || '');
+                sessionStorage.setItem('update_notes',           data.notes || '');
+
+                document.getElementById('updateDot').classList.add('visible');
+                document.getElementById('updateVersionLine').textContent =
+                    'Current: v' + data.current_version + '   →   New: v' + _remoteVersion;
+                document.getElementById('updateNotes').textContent =
+                    data.notes || 'No release notes.';
+
+                if (!_downloadUrl) {
+                    document.getElementById('updateNowBtn').disabled = true;
+                    setStatus('No download URL in version.json — update manually.', 'err');
+                }
+                openUpdateModal();
+            } else {
+                sessionStorage.setItem('update_available', 'false');
+            }
+        } catch (e) {}
     }
-
-    window.activateProfile = async function (id) {
-        const res  = await fetch(`/api/profiles/${id}/activate`, { method: 'POST' });
-        const data = await res.json();
-        if (data.success) {
-            activeId = id;
-            renderProfiles();
-            updateFab();
-            sessionStorage.clear();
-            showAddStatus('Switched to ' + data.name, 'ok');
-        }
-    };
-
-    window.deleteProfile = async function (id) {
-        if (!confirm('Delete this profile?')) return;
-        const res  = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (data.success) fetchProfiles();
-    };
-
-    window.editProfile = function (id) {
-        const p = profiles.find(x => x.id === id);
-        if (!p) return;
-        const card = document.getElementById('profilesList').querySelector(`[data-id="${id}"]`);
-        const form = document.createElement('div');
-        form.className = 'profile-edit-form';
-        form.innerHTML = `
-            <input class="pm-input" id="edit-name-${id}"  value="${escHtml(p.name)}"                placeholder="Profile name">
-            <input class="pm-input" id="edit-url-${id}"   value="${escHtml(p.store_url)}"           placeholder="Store URL">
-            <input class="pm-input" id="edit-token-${id}" placeholder="New token (leave blank to keep)" type="password">
-            <div class="pm-row">
-                <input class="pm-input" id="edit-ver-${id}" value="${escHtml(p.api_version)}" placeholder="API Version">
-            </div>
-            <div class="pm-row">
-                <input class="pm-input" id="edit-ns-${id}"  value="${escHtml(p.metafield_namespace)}" placeholder="Metafield Namespace">
-                <input class="pm-input" id="edit-key-${id}" value="${escHtml(p.metafield_key)}"       placeholder="Metafield Key">
-            </div>
-            <div class="edit-actions">
-                <button class="btn-save-edit"   onclick="saveEdit('${id}')">Save</button>
-                <button class="btn-cancel-edit" onclick="fetchProfiles()">Cancel</button>
-            </div>
-        `;
-        card.replaceWith(form);
-    };
-
-    window.saveEdit = async function (id) {
-        const body = {
-            name:                document.getElementById(`edit-name-${id}`).value.trim(),
-            store_url:           document.getElementById(`edit-url-${id}`).value.trim(),
-            access_token:        document.getElementById(`edit-token-${id}`).value.trim(),
-            api_version:         document.getElementById(`edit-ver-${id}`).value.trim(),
-            metafield_namespace: document.getElementById(`edit-ns-${id}`).value.trim(),
-            metafield_key:       document.getElementById(`edit-key-${id}`).value.trim(),
-        };
-        const res  = await fetch(`/api/profiles/${id}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-        });
-        const data = await res.json();
-        if (data.success) fetchProfiles();
-    };
-
-    window.addProfile = async function () {
-        const name    = document.getElementById('newName').value.trim();
-        const url     = document.getElementById('newUrl').value.trim();
-        const token   = document.getElementById('newToken').value.trim();
-        const version = document.getElementById('newVersion').value.trim() || '2024-07';
-        const ns      = document.getElementById('newNs').value.trim();
-        const key     = document.getElementById('newKey').value.trim();
-
-        if (!name || !url || !token) { showAddStatus('Name, URL, and Token are required.', 'err'); return; }
-
-        const res  = await fetch('/api/profiles', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, store_url: url, access_token: token, api_version: version, metafield_namespace: ns, metafield_key: key })
-        });
-        const data = await res.json();
-        if (data.success) {
-            ['newName','newUrl','newToken','newVersion','newNs','newKey'].forEach(id => {
-                document.getElementById(id).value = '';
-            });
-            showAddStatus('Profile added!', 'ok');
-            fetchProfiles();
-        } else {
-            showAddStatus('Error adding profile.', 'err');
-        }
-    };
-
-    function showAddStatus(msg, type) {
-        const el = document.getElementById('addStatus');
-        el.textContent = msg;
-        el.className   = 'pm-status ' + type;
-        setTimeout(() => { el.textContent = ''; el.className = 'pm-status'; }, 3000);
-    }
-
-    function escHtml(s) {
-        return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    window.openProfilesModal = function () {
-        document.getElementById('profilesOverlay').classList.add('open');
-        fetchProfiles();
-    };
-    window.closeProfilesModal = function () {
-        document.getElementById('profilesOverlay').classList.remove('open');
-    };
-    window.handleOverlayClick = function (e) {
-        if (e.target === document.getElementById('profilesOverlay')) closeProfilesModal();
-    };
 
     // ── Init ────────────────────────────────────────────────────────────────
-    fetchProfiles();
     checkForUpdate();
     async function loadPlanBadge() {
-    try {
-        const res  = await fetch('/api/license/status');
-        const data = await res.json();
-        if (data.valid) {
-            const badge = document.getElementById('planNavBadge');
-            if (data.free_trial) {
-                badge.textContent   = 'Free Trial';
-                badge.className     = 'plan-nav-badge FREE_TRIAL';
-                badge.style.display = 'inline-block';
-            } else {
-                badge.textContent   = data.label;
-                badge.className     = 'plan-nav-badge ' + data.plan;
-                badge.style.display = 'inline-block';
+        try {
+            const res  = await fetch('/api/license/status');
+            const data = await res.json();
+            if (data.valid) {
+                const badge = document.getElementById('planNavBadge');
+                if (data.free_trial) {
+                    badge.textContent   = 'Free Trial';
+                    badge.className     = 'plan-nav-badge FREE_TRIAL';
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.textContent   = data.label;
+                    badge.className     = 'plan-nav-badge ' + data.plan;
+                    badge.style.display = 'inline-block';
+                }
             }
-        }
-    } catch(e) {}
-}
-
-loadPlanBadge();
-
-async function applyNavPermissions() {
-    // No longer hiding links by default. 
-    // They will remain visible but clicking them will result in 403 redirect if unauthorized.
-}
-applyNavPermissions();
+        } catch(e) {}
+    }
+    loadPlanBadge();
 })();
-</script>
+</script>
+
+<!-- Settings Logic -->
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
