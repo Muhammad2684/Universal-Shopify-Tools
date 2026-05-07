@@ -29,36 +29,6 @@
         100% { transform: scaleX(1); transform-origin: left; }
     }
 
-    /* ── Context Menu Styles ── */
-    .context-menu {
-        position: absolute;
-        background: var(--bg-secondary, #1a1a2e);
-        border: 1px solid var(--border-color, #33334d);
-        box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-        z-index: 10000;
-        padding: 5px 0;
-        opacity: 0;
-        visibility: hidden;
-        transition: opacity 0.2s ease, visibility 0.2s ease;
-        border-radius: 4px;
-    }
-    .context-menu ul {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-    }
-    .context-menu li a {
-        display: block;
-        padding: 8px 15px;
-        text-decoration: none;
-        color: var(--text-light, #e0e0e0);
-        transition: background 0.2s ease;
-    }
-    .context-menu li a:hover {
-        background: var(--accent-color, #e94560);
-        color: var(--button-text, #ffffff);
-    }
-
     *, *::before, *::after { box-sizing: border-box; }
 ul { list-style: none; padding: 0; margin: 0; }
 
@@ -418,15 +388,6 @@ ul { list-style: none; padding: 0; margin: 0; }
 <!-- Page loading bar -->
 <div class="page-loading-bar" id="loadingBar"></div>
 
-<!-- Custom Context Menu -->
-<div id="context-menu" class="context-menu">
-  <ul>
-    <li><a href="#" onclick="location.reload(); return false;">Refresh Page</a></li>
-    <li><a href="#" onclick="history.back(); return false;">Go Back</a></li>
-    <li><a href="#" onclick="history.forward(); return false;">Go Forward</a></li>
-  </ul>
-</div>
-
 <header class="app-header">
     <h1 style="text-align:center;">
         My Accountant
@@ -600,17 +561,8 @@ ul { list-style: none; padding: 0; margin: 0; }
     {% include 'navigation.html' %}
 </footer>
 
-<!-- Delete All Modal -->
-<div class="modal-overlay" id="deleteModal" onclick="closeDeleteModal()">
-    <div class="modal-box" onclick="event.stopPropagation()">
-        <h2>Delete All Entries?</h2>
-        <p>This will remove all entries. You can undo this action immediately after.</p>
-        <div class="modal-btns">
-            <button class="btn-modal-cancel" onclick="closeDeleteModal()">Cancel</button>
-            <button class="btn-yes-delete"   onclick="confirmDeleteAll()">Delete All</button>
-        </div>
-    </div>
-</div>
+<!-- Shared Scripts -->
+<script src="{{ url_for('static', filename='js/Rmenu.js') }}"></script>
 
 <div class="toast" id="toast"></div>
 
@@ -1022,26 +974,6 @@ function render() {
 // ── Init ──────────────────────────────────────────────────────────────────────
 hydrate();
 selectType('packed');
-</script>
-
-<!-- Custom Right-Click Menu Script -->
-<script>
-(function() {
-  const contextMenu = document.getElementById('context-menu');
-
-  document.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
-    contextMenu.style.left = e.pageX + 'px';
-    contextMenu.style.top = e.pageY + 'px';
-    contextMenu.style.opacity = '1';
-    contextMenu.style.visibility = 'visible';
-  });
-
-  document.addEventListener('click', function() {
-    contextMenu.style.opacity = '0';
-    contextMenu.style.visibility = 'hidden';
-  });
-})();
 </script>
 
 <script>

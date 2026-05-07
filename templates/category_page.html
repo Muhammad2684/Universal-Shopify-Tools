@@ -13,7 +13,18 @@
             <div class="category-divider">In-stock products</div>
             {% set ns.divider_inserted = true %}
         {% endif %}
-        <div class="product-card{% if product.above_threshold %} above-threshold{% endif %}">
+        <div class="product-card{% if product.above_threshold %} above-threshold{% endif %}"
+             data-product-id="{{ product.product_id }}"
+             data-title="{{ product.title | e }}"
+             data-image-url="{{ product.image_url | e }}"
+             data-sku="{{ product.sku | e }}"
+             data-sizes="{{ product.sizes | e }}"
+             data-current-qty="{{ product.current_qty }}"
+             data-threshold="{{ product.threshold }}"
+             data-comment="{{ product.comment | e }}"
+             data-wholesale-price="{{ product.wholesale_price }}"
+             data-retail-price="{{ product.retail_price }}"
+             data-category="{{ page_title | e }}">
             <img src="{{ product.image_url if product.image_url else url_for('static', filename='icons/Icon.png') }}"
                  alt="{{ product.title }}">
             <div class="product-card-body">

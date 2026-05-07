@@ -130,10 +130,12 @@
     };
 
     window.swDeleteProfile = async function (id) {
-        if (!confirm('Delete this profile?')) return;
-        const res  = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
-        const data = await res.json();
-        if (data.success) _swFetchProfiles();
+        window.CustomModal.confirm('Delete Profile', 'Are you sure you want to delete this profile?', async (ok) => {
+            if (!ok) return;
+            const res  = await fetch(`/api/profiles/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) _swFetchProfiles();
+        });
     };
 
     window.swEditProfile = function (id) {

@@ -384,11 +384,13 @@ async function saveCat(slug) {
     } catch(e) { status.textContent='Network error'; status.className='cat-status err'; }
 }
 async function deleteCategory(slug) {
-    if (!confirm('Delete this category? Shopify products are not affected.')) return;
-    try {
-        var res=await fetch('/api/stock_categories/'+slug,{method:'DELETE'}), data=await res.json();
-        if (data.success) { _cats=_cats.filter(function(c){return c.slug!==slug;}); renderCats(); }
-    } catch(e) {}
+    window.CustomModal.confirm('Delete Category', 'Delete this category? Shopify products are not affected.', async (ok) => {
+        if (!ok) return;
+        try {
+            var res=await fetch('/api/stock_categories/'+slug,{method:'DELETE'}), data=await res.json();
+            if (data.success) { _cats=_cats.filter(function(c){return c.slug!==slug;}); renderCats(); }
+        } catch(e) {}
+    });
 }
 async function addCategory() {
     var title  = document.getElementById('newTitle').value.trim();
@@ -439,10 +441,11 @@ async function loadInCategory() {
     document.getElementById('pmFooterInfo').textContent = '';
     try {
         var res=await fetch('/api/category_products/'+_pmSlug), data=await res.json();
+        if (_pmTab !== 'in') return;
         if (!data.success) { document.getElementById('pmList').innerHTML='<div class="pm-state">Error: '+esc(data.error)+'</div>'; return; }
         _pmInProds = data.results;
         renderInCategory(_pmInProds);
-    } catch(e) { document.getElementById('pmList').innerHTML='<div class="pm-state">Network error</div>'; }
+    } catch(e) { if (_pmTab === 'in') document.getElementById('pmList').innerHTML='<div class="pm-state">Network error</div>'; }
 }
 
 function renderInCategory(prods) {

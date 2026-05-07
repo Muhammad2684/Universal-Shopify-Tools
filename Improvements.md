@@ -45,8 +45,8 @@
 * ~~Subcategories~~
 * ~~No product image~~
 * ~~Product comments~~
-* Product selection
-* Image Folder
+* ~~Product selection~~
+* ~~Image Folder~~
 
 
 

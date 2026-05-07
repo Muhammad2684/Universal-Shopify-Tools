@@ -5,7 +5,14 @@ import threading
 import requests
 import datetime
 import csv
-from flask import Flask, render_template, jsonify, request, abort, redirect, url_for
+from flask import Flask, render_template, jsonify, request, abort, redirect, url_for, send_file
+import io
+from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer, KeepTogether
+from reportlab.lib.units import inch
+from reportlab.lib.utils import ImageReader
 
 # ── PyInstaller path resolution ──────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
@@ -33,6 +40,7 @@ def SHOPIFY_API_VERSION():  return active_creds["SHOPIFY_API_VERSION"]
 def METAFIELD_NAMESPACE():  return active_creds["METAFIELD_NAMESPACE"]
 def METAFIELD_KEY():        return active_creds["METAFIELD_KEY"]
 def STOCK_COMMENT_KEY():    return "stock_comment"
+def WHOLESALE_PRICE_KEY():  return "wholesale_price"
 
 def _apply_profile(p):
     active_creds["SHOPIFY_STORE_URL"]    = p["store_url"]
@@ -120,6 +128,9 @@ def get_headers():
         "Content-Type": "application/json"
     }
 
+def get_rest_url():
+    return f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}"
+
 def credentials_ok():
     return bool(SHOPIFY_STORE_URL() and SHOPIFY_ACCESS_TOKEN())
 
@@ -128,7 +139,7 @@ def credentials_ok():
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.2.3"
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
 
 _update_state = {"status": "idle", "percent": 0, "error": ""}
@@ -904,9 +915,12 @@ def process_product_edges(edges):
     processed = []
     for edge in (edges or []):
         node        = edge['node']
-        current_qty = node['variants']['edges'][0]['node']['inventoryQuantity'] if node['variants']['edges'] else 0
+        first_v     = node['variants']['edges'][0]['node'] if node['variants']['edges'] else {}
+        current_qty = first_v.get('inventoryQuantity', 0)
         threshold   = int(node.get('thresholdMetafield', {}).get('value', 0)) if node.get('thresholdMetafield') else 0
         comment     = node.get('commentMetafield', {}).get('value', '') if node.get('commentMetafield') else ''
+        wholesale   = node.get('wholesalePriceMetafield', {}).get('value', '0.00') if node.get('wholesalePriceMetafield') else '0.00'
+        retail      = first_v.get('price', '0.00')
         
         # Extract all variants with their titles (sizes) and inventory
         variants = []
@@ -915,6 +929,8 @@ def process_product_edges(edges):
             variants.append({
                 'title': variant_node.get('title', 'N/A'),
                 'inventory': variant_node['inventoryQuantity'],
+                'sku': variant_node.get('sku', ''),
+                'price': variant_node.get('price', '0.00')
             })
         
         processed.append({
@@ -923,8 +939,12 @@ def process_product_edges(edges):
             "image_url":   node['featuredImage']['url'] if node.get('featuredImage') else None,
             "current_qty": current_qty,
             "threshold":   threshold,
+            "sku":         variants[0]['sku'] if variants else '',
+            "sizes":       '; '.join([v['title'] for v in variants]) if variants else '',
             "variants":    variants,
             "comment":     comment,
+            "wholesale_price": wholesale,
+            "retail_price":    retail
         })
     return processed
 
@@ -978,10 +998,10 @@ def api_get_categories():
 def api_add_category():
     import re
     body  = request.get_json(silent=True) or {}
-    title = body.get('title', '').strip()
-    tag   = body.get('tag',   '').strip()
-    slug  = body.get('slug',  '').strip()
-    parent = body.get('parent', '').strip() or None
+    title = (body.get('title') or '').strip()
+    tag   = (body.get('tag')   or '').strip()
+    slug  = (body.get('slug')  or '').strip()
+    parent = (body.get('parent') or '').strip() or None
 
     if not title or not tag or not slug:
         return jsonify({'success': False, 'error': 'title, tag, and slug are all required'}), 400
@@ -1054,6 +1074,7 @@ def show_urgent():
     tag_query_string = " OR ".join([f"tag:'{tag}'" for tag in all_tags])
     ns               = METAFIELD_NAMESPACE()
     comment_key      = STOCK_COMMENT_KEY()
+    wholesale_key    = WHOLESALE_PRICE_KEY()
     query = f"""
     {{
       products(first: 250, query: "({tag_query_string})") {{
@@ -1062,9 +1083,12 @@ def show_urgent():
             id title
             featuredImage {{ url }}
             variants(first: 1) {{
-              edges {{ node {{ inventoryQuantity }} }}
+              edges {{ node {{ sku title inventoryQuantity price }} }}
             }}
             commentMetafield: metafield(namespace: "{ns}", key: "{comment_key}") {{
+              value
+            }}
+            wholesalePriceMetafield: metafield(namespace: "{ns}", key: "{wholesale_key}") {{
               value
             }}
           }}
@@ -1078,15 +1102,21 @@ def show_urgent():
         for edge in data.get('data', {}).get('products', {}).get('edges', []):
             node = edge['node']
             if node['variants']['edges']:
-                qty = node['variants']['edges'][0]['node']['inventoryQuantity']
+                v_node = node['variants']['edges'][0]['node']
+                qty = v_node['inventoryQuantity']
                 if qty < 0:
                     products_to_display.append({
                         "product_id": node['id'],
                         "title":       node['title'],
                         "image_url":   node['featuredImage']['url'] if node.get('featuredImage') else None,
+                        "sku":         v_node.get('sku', '') if node['variants']['edges'] else '',
+                        "sizes":       v_node.get('title', '') if node['variants']['edges'] else '',
                         "current_qty": qty,
                         "needed_qty":  0 - qty,
-                        "comment":     node.get('commentMetafield', {}).get('value', '') if node.get('commentMetafield') else ''
+                        "threshold":   '',
+                        "comment":     node.get('commentMetafield', {}).get('value', '') if node.get('commentMetafield') else '',
+                        "wholesale_price": node.get('wholesalePriceMetafield', {}).get('value', '0.00') if node.get('wholesalePriceMetafield') else '0.00',
+                        "retail_price":    v_node.get('price', '0.00')
                     })
     sorted_products = sorted(products_to_display, key=lambda p: p['needed_qty'], reverse=True)
     return render_template('urgent_page.html', products=sorted_products, page_title="Urgent",
@@ -1106,6 +1136,7 @@ def show_category(category_slug):
     ns  = METAFIELD_NAMESPACE()
     key = METAFIELD_KEY()
     comment_key = STOCK_COMMENT_KEY()
+    wholesale_key = WHOLESALE_PRICE_KEY()
     query = f"""
     {{
       products(first: 250, query: "tag:'{tag}'") {{
@@ -1118,7 +1149,9 @@ def show_category(category_slug):
                 node {{
                   id
                   title
+                  sku
                   inventoryQuantity
+                  price
                 }}
               }}
             }}
@@ -1126,6 +1159,9 @@ def show_category(category_slug):
               value
             }}
             commentMetafield: metafield(namespace: "{ns}", key: "{comment_key}") {{
+              value
+            }}
+            wholesalePriceMetafield: metafield(namespace: "{ns}", key: "{wholesale_key}") {{
               value
             }}
           }}
@@ -1212,6 +1248,159 @@ def update_threshold():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/stock/mark_urgent_bulk', methods=['POST'])
+def mark_urgent_bulk():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body        = request.get_json(silent=True) or {}
+    product_ids = body.get('product_ids', [])
+    
+    if not product_ids:
+        return jsonify({'success': False, 'error': 'No product IDs provided'}), 400
+
+    headers = get_headers()
+    success_count = 0
+    errors = []
+
+    for pid in product_ids:
+        try:
+            # 1. Get current tags
+            # Ensure pid is in the correct format for REST (remove gid://shopify/Product/ if present)
+            clean_id = pid.split('/')[-1] if 'gid://' in pid else pid
+            prod_url = f"{get_rest_url()}/products/{clean_id}.json"
+            
+            resp = requests.get(prod_url, headers=headers, params={"fields": "id,tags"})
+            if resp.status_code != 200:
+                errors.append(f"Failed to fetch {pid}")
+                continue
+                
+            product = resp.json().get('product', {})
+            existing_tags = product.get('tags', '')
+            tag_list = [t.strip() for t in existing_tags.split(',') if t.strip()]
+            
+            if "Urgent" not in tag_list:
+                tag_list.append("Urgent")
+                update_resp = requests.put(prod_url, headers=headers, 
+                                          json={"product": {"id": clean_id, "tags": ', '.join(tag_list)}})
+                if update_resp.status_code == 200:
+                    success_count += 1
+                else:
+                    errors.append(f"Failed to update {pid}")
+            else:
+                success_count += 1 # Already urgent
+        except Exception as e:
+            errors.append(str(e))
+
+    return jsonify({'success': True, 'count': success_count, 'errors': errors})
+
+@app.route('/api/stock/add_comment_bulk', methods=['POST'])
+def add_comment_bulk():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body        = request.get_json(silent=True) or {}
+    product_ids = body.get('product_ids', [])
+    comment     = body.get('comment', '')
+
+    if not product_ids:
+        return jsonify({'success': False, 'error': 'No product IDs provided'}), 400
+
+    ns          = METAFIELD_NAMESPACE()
+    comment_key = STOCK_COMMENT_KEY()
+
+    # Use GraphQL for bulk metafield set
+    mutation = """
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { key namespace value }
+        userErrors  { field message }
+      }
+    }
+    """
+    
+    metafields_to_set = []
+    for pid in product_ids:
+        # GraphQL needs the full GID
+        full_id = pid if 'gid://' in pid else f"gid://shopify/Product/{pid}"
+        # Use "N/A" for empty comments to satisfy Shopify validation
+        val = str(comment).strip() if comment and comment.strip() else "N/A"
+        metafields_to_set.append({
+            "ownerId":   full_id,
+            "namespace": ns,
+            "key":       comment_key,
+            "value":     val,
+            "type":      "multi_line_text_field"
+        })
+
+    try:
+        resp = requests.post(
+            get_graphql_url(),
+            headers=get_headers(),
+            json={"query": mutation, "variables": {"metafields": metafields_to_set}}
+        )
+        resp.raise_for_status()
+        data   = resp.json()
+        errors = data.get('data', {}).get('metafieldsSet', {}).get('userErrors', [])
+        if errors:
+            return jsonify({'success': False, 'error': errors[0]['message']}), 400
+        return jsonify({'success': True, 'count': len(product_ids)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/stock/change_category_bulk', methods=['POST'])
+def change_category_bulk():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body = request.get_json(silent=True) or {}
+    product_ids = body.get('product_ids', [])
+    new_tag = body.get('new_tag', '').strip()
+
+    if not product_ids or not new_tag:
+        return jsonify({'success': False, 'error': 'product_ids and new_tag required'}), 400
+
+    stock_cats = get_stock_categories_dict()
+    all_stock_tags = {c['tag'] for c in stock_cats.values()}
+
+    success_count = 0
+    errors = []
+
+    headers = get_headers()
+    for pid in product_ids:
+        try:
+            numeric_id = pid.split('/')[-1]
+            prod_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/products/{numeric_id}.json"
+            
+            resp = requests.get(prod_url, headers=headers, params={"fields": "id,tags"})
+            resp.raise_for_status()
+            product = resp.json().get('product', {})
+            existing_tags = product.get('tags', '')
+            tag_list = [t.strip() for t in existing_tags.split(',') if t.strip()]
+            
+            # Remove all existing stock tags
+            tag_list = [t for t in tag_list if t not in all_stock_tags]
+            
+            # Add new tag
+            if new_tag not in tag_list:
+                tag_list.append(new_tag)
+                
+            updated = requests.put(prod_url, headers=headers,
+                                   json={"product": {"id": numeric_id, "tags": ', '.join(tag_list)}})
+            updated.raise_for_status()
+            success_count += 1
+        except Exception as e:
+            errors.append(f"Product {pid}: {str(e)}")
+
+    if errors:
+        return jsonify({
+            'success': False, 
+            'error': f"Completed with errors. {success_count} success, {len(errors)} failed.",
+            'details': errors
+        }), 207
+
+    return jsonify({'success': True})
+
 @app.route('/api/update_stock_comment', methods=['POST'])
 def update_stock_comment():
     if not credentials_ok():
@@ -1227,6 +1416,47 @@ def update_stock_comment():
     ns          = METAFIELD_NAMESPACE()
     comment_key = STOCK_COMMENT_KEY()
 
+    comment_value = str(comment).strip() if comment and comment.strip() else None
+
+    if comment_value is None:
+        # Remove the metafield entirely when clearing the note.
+        query = f"""
+        {{
+          product(id: \"{product_id}\") {{
+            metafield(namespace: \"{ns}\", key: \"{comment_key}\") {{
+              id
+            }}
+          }}
+        }}
+        """
+        data = run_graphql_query(query)
+        metafield_id = None
+        if data and 'data' in data:
+            metafield = data.get('data', {}).get('product', {}).get('metafield')
+            metafield_id = metafield.get('id') if metafield else None
+
+        if metafield_id:
+            delete_mutation = """
+            mutation metafieldDelete($input: MetafieldDeleteInput!) {
+              metafieldDelete(input: $input) {
+                deletedId
+                userErrors { field message }
+              }
+            }
+            """
+            delete_vars = {"input": {"id": metafield_id}}
+            resp = requests.post(
+                get_graphql_url(),
+                headers=get_headers(),
+                json={"query": delete_mutation, "variables": delete_vars}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            errors = data.get('data', {}).get('metafieldDelete', {}).get('userErrors', [])
+            if errors:
+                return jsonify({'success': False, 'error': errors[0]['message']}), 400
+        return jsonify({'success': True, 'comment': ''})
+
     mutation = """
     mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
       metafieldsSet(metafields: $metafields) {
@@ -1240,9 +1470,10 @@ def update_stock_comment():
             "ownerId":   product_id,
             "namespace": ns,
             "key":       comment_key,
-            "value":     str(comment),
+            "value":     comment_value,
             "type":      "multi_line_text_field"
         }]
+
     }
 
     try:
@@ -1374,6 +1605,167 @@ def remove_product_from_category():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     
+
+@app.route('/api/stock/generate_pdf', methods=['POST'])
+def generate_pdf():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body = request.get_json(silent=True) or {}
+    product_ids = body.get('product_ids', [])
+    
+    if not product_ids:
+        return jsonify({'success': False, 'error': 'No products selected.'}), 400
+
+    ns = METAFIELD_NAMESPACE()
+    wholesale_key = WHOLESALE_PRICE_KEY()
+    
+    # Shopify GraphQL nodes query for multiple IDs
+    ids_gql = ', '.join([f'"{pid}"' for pid in product_ids])
+    query = f"""
+    {{
+      nodes(ids: [{ids_gql}]) {{
+        ... on Product {{
+          id
+          title
+          featuredImage {{ url }}
+          variants(first: 1) {{
+            edges {{
+              node {{
+                sku
+                price
+              }}
+            }}
+          }}
+          wholesalePriceMetafield: metafield(namespace: "{ns}", key: "{wholesale_key}") {{
+            value
+          }}
+        }}
+      }}
+    }}
+    """
+    
+    data = run_graphql_query(query)
+    if not data or 'data' not in data or not data['data'].get('nodes'):
+        return jsonify({'success': False, 'error': 'Failed to fetch product data.'}), 500
+        
+    products = []
+    for node in data['data']['nodes']:
+        if node:
+            v_edges = node.get('variants', {}).get('edges', [])
+            variant = v_edges[0]['node'] if v_edges else {}
+            products.append({
+                'title': node.get('title', 'N/A'),
+                'image_url': node['featuredImage']['url'] if node.get('featuredImage') else None,
+                'sku': variant.get('sku', 'N/A'),
+                'retail_price': variant.get('price', '0.00'),
+                'wholesale_price': node.get('wholesalePriceMetafield', {}).get('value', '0.00') if node.get('wholesalePriceMetafield') else '0.00'
+            })
+
+    if not products:
+        return jsonify({'success': False, 'error': 'No valid products found.'}), 404
+
+    # Generate PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=0.4*inch, rightMargin=0.4*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    card_title_style = ParagraphStyle(
+        'CardTitle',
+        parent=styles['Normal'],
+        fontSize=9,
+        leading=10,
+        alignment=1, # Center
+        spaceAfter=2
+    )
+    
+    price_style = ParagraphStyle(
+        'PriceStyle',
+        parent=styles['Normal'],
+        fontSize=8,
+        leading=9,
+        alignment=1, # Center
+    )
+
+    # Grid settings
+    cols = 3
+    card_width = 2.4 * inch
+    
+    rows = []
+    current_row = []
+    
+    for p in products:
+        card_elements = []
+        
+        # Image
+        if p['image_url']:
+            try:
+                img_resp = requests.get(p['image_url'], timeout=10)
+                if img_resp.status_code == 200:
+                    img_data = io.BytesIO(img_resp.content)
+                    img = Image(img_data, width=1.6*inch, height=1.6*inch)
+                    img.hAlign = 'CENTER'
+                    card_elements.append(img)
+                else:
+                    card_elements.append(Spacer(1, 1.6*inch))
+            except Exception:
+                card_elements.append(Spacer(1, 1.6*inch))
+        else:
+            card_elements.append(Spacer(1, 1.6*inch))
+            
+        card_elements.append(Spacer(1, 6))
+        card_elements.append(Paragraph(f"<b>{p['title']}</b>", card_title_style))
+        card_elements.append(Paragraph(f"SKU: {p['sku']}", price_style))
+        card_elements.append(Spacer(1, 4))
+        card_elements.append(Paragraph(f"Retail: <b>${p['retail_price']}</b>", price_style))
+        card_elements.append(Paragraph(f"Wholesale: <b>${p['wholesale_price']}</b>", price_style))
+        
+        # Card table cell
+        card_table = Table([[e] for e in card_elements], colWidths=[card_width-0.2*inch])
+        card_table.setStyle(TableStyle([
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+            ('BOX', (0,0), (-1,-1), 0.5, colors.lightgrey),
+            ('TOPPADDING', (0,0), (-1,-1), 6),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ]))
+        
+        current_row.append(card_table)
+        
+        if len(current_row) == cols:
+            rows.append(current_row)
+            current_row = []
+            
+    if current_row:
+        while len(current_row) < cols:
+            current_row.append("")
+        rows.append(current_row)
+        
+    main_table = Table(rows, colWidths=[card_width]*cols)
+    main_table.setStyle(TableStyle([
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+        ('LEFTPADDING', (0,0), (-1,-1), 4),
+        ('RIGHTPADDING', (0,0), (-1,-1), 4),
+        ('TOPPADDING', (0,0), (-1,-1), 8),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+    ]))
+    
+    elements.append(main_table)
+    try:
+        doc.build(elements)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'PDF generation error: {str(e)}'}), 500
+    
+    buffer.seek(0)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f'stock_catalog_{datetime.datetime.now().strftime("%Y%m%d")}.pdf',
+        mimetype='application/pdf'
+    )
+
 
 # ════════════════════════════════════════════════════════════════════════════
 # QTY DEDUCTION
