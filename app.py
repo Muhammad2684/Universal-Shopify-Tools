@@ -7,10 +7,11 @@ import datetime
 import csv
 from flask import Flask, render_template, jsonify, request, abort, redirect, url_for, send_file
 import io
+import webview
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Image, Spacer, KeepTogether, PageBreak
 from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 
@@ -22,9 +23,12 @@ if getattr(sys, 'frozen', False):
 else:
     app = Flask(__name__)
 
-BASE_DIR = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'UniversalSHTools')
-os.makedirs(BASE_DIR, exist_ok=True)
+if sys.platform == "win32":
+    BASE_DIR = os.path.join(os.environ.get('APPDATA'), 'UniversalSHTools')
+else:
+    BASE_DIR = os.path.join(os.path.expanduser('~'), '.UniversalSHTools')
 
+os.makedirs(BASE_DIR, exist_ok=True)
 
 active_creds = {
     "SHOPIFY_STORE_URL":    "",
@@ -139,7 +143,7 @@ def credentials_ok():
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-APP_VERSION = "1.2.3"
+APP_VERSION = "1.3.0"
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
 
 _update_state = {"status": "idle", "percent": 0, "error": ""}
@@ -1055,11 +1059,56 @@ def api_update_category(slug):
 @app.route('/api/stock_categories/<slug>', methods=['DELETE'])
 def api_delete_category(slug):
     cats = load_categories()
-    new  = [c for c in cats if c['slug'] != slug]
-    if len(new) == len(cats):
+    cat  = next((c for c in cats if c['slug'] == slug), None)
+    if not cat:
         return jsonify({'success': False, 'error': 'Category not found'}), 404
-    save_categories(new)
-    return jsonify({'success': True})
+
+    tag = cat['tag']
+
+    # Collect all tags to remove: this category + any sub-categories
+    tags_to_remove = {tag}
+    for c in cats:
+        if c.get('parent') == slug:
+            tags_to_remove.add(c['tag'])
+
+    # Remove tag from all products in Shopify
+    if credentials_ok() and tag:
+        headers = get_headers()
+        api_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}"
+        processed = 0
+        page = 1
+
+        while True:
+            try:
+                resp = requests.get(f"{api_url}/products.json", headers=headers, params={
+                    'tag': tag, 'fields': 'id,tags', 'limit': 250, 'page': page
+                })
+                if resp.status_code != 200:
+                    break
+                products = resp.json().get('products', [])
+                if not products:
+                    break
+
+                for product in products:
+                    existing = [t.strip() for t in product.get('tags', '').split(',') if t.strip()]
+                    cleaned  = [t for t in existing if t not in tags_to_remove]
+                    if len(cleaned) != len(existing):
+                        requests.put(
+                            f"{api_url}/products/{product['id']}.json",
+                            headers=headers,
+                            json={"product": {"id": product['id'], "tags": ', '.join(cleaned)}}
+                        )
+                        processed += 1
+
+                page += 1
+            except Exception:
+                break
+
+    # Remove the category (and sub-categories) from local file
+    new_cats = [c for c in cats if c['slug'] != slug and c.get('parent') != slug]
+    save_categories(new_cats)
+
+    return jsonify({'success': True, 'products_updated': processed})
 
 # ── Stock pages ──────────────────────────────────────────────────────────────
 
@@ -1416,46 +1465,8 @@ def update_stock_comment():
     ns          = METAFIELD_NAMESPACE()
     comment_key = STOCK_COMMENT_KEY()
 
-    comment_value = str(comment).strip() if comment and comment.strip() else None
-
-    if comment_value is None:
-        # Remove the metafield entirely when clearing the note.
-        query = f"""
-        {{
-          product(id: \"{product_id}\") {{
-            metafield(namespace: \"{ns}\", key: \"{comment_key}\") {{
-              id
-            }}
-          }}
-        }}
-        """
-        data = run_graphql_query(query)
-        metafield_id = None
-        if data and 'data' in data:
-            metafield = data.get('data', {}).get('product', {}).get('metafield')
-            metafield_id = metafield.get('id') if metafield else None
-
-        if metafield_id:
-            delete_mutation = """
-            mutation metafieldDelete($input: MetafieldDeleteInput!) {
-              metafieldDelete(input: $input) {
-                deletedId
-                userErrors { field message }
-              }
-            }
-            """
-            delete_vars = {"input": {"id": metafield_id}}
-            resp = requests.post(
-                get_graphql_url(),
-                headers=get_headers(),
-                json={"query": delete_mutation, "variables": delete_vars}
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            errors = data.get('data', {}).get('metafieldDelete', {}).get('userErrors', [])
-            if errors:
-                return jsonify({'success': False, 'error': errors[0]['message']}), 400
-        return jsonify({'success': True, 'comment': ''})
+    # Use "N/A" placeholder when clearing — avoids fragile two-step delete
+    comment_value = str(comment).strip() if comment and comment.strip() else "N/A"
 
     mutation = """
     mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
@@ -1487,10 +1498,99 @@ def update_stock_comment():
         errors = data.get('data', {}).get('metafieldsSet', {}).get('userErrors', [])
         if errors:
             return jsonify({'success': False, 'error': errors[0]['message']}), 400
-        return jsonify({'success': True, 'comment': comment})
+        return jsonify({'success': True, 'comment': '' if comment_value == "N/A" else comment})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
-        
+
+
+@app.route('/api/update_wholesale_price', methods=['POST'])
+def update_wholesale_price():
+    if not credentials_ok():
+        return jsonify({'success': False, 'error': 'No store profile active.'}), 500
+
+    body        = request.get_json(silent=True) or {}
+    product_id  = body.get('product_id', '').strip()
+    price       = body.get('price', '').strip()
+
+    if not product_id:
+        return jsonify({'success': False, 'error': 'product_id required'}), 400
+
+    try:
+        price_val = f"{float(price):.2f}"
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'error': 'Invalid price value'}), 400
+
+    if price_val == '0.00' or not price:
+        mutation_clear = """
+        mutation metafieldDelete($input: MetafieldDeleteInput!) {
+          metafieldDelete(input: $input) {
+            deletedId
+            userErrors { field message }
+          }
+        }
+        """
+        query = f"""
+        {{
+          product(id: \"{product_id}\") {{
+            metafield(namespace: \"{METAFIELD_NAMESPACE()}\", key: \"{WHOLESALE_PRICE_KEY()}\") {{
+              id
+            }}
+          }}
+        }}
+        """
+        data = run_graphql_query(query)
+        metafield_id = None
+        if data and 'data' in data:
+            mf = data.get('data', {}).get('product', {}).get('metafield')
+            metafield_id = mf.get('id') if mf else None
+
+        if metafield_id:
+            resp = requests.post(
+                get_graphql_url(),
+                headers=get_headers(),
+                json={"query": mutation_clear, "variables": {"input": {"id": metafield_id}}}
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            errors = data.get('data', {}).get('metafieldDelete', {}).get('userErrors', [])
+            if errors:
+                return jsonify({'success': False, 'error': errors[0]['message']}), 400
+        return jsonify({'success': True, 'price': ''})
+
+    mutation = """
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) {
+        metafields { key namespace value }
+        userErrors  { field message }
+      }
+    }
+    """
+    variables = {
+        "metafields": [{
+            "ownerId":   product_id,
+            "namespace": METAFIELD_NAMESPACE(),
+            "key":       WHOLESALE_PRICE_KEY(),
+            "value":     price_val,
+            "type":      "number_decimal"
+        }]
+    }
+
+    try:
+        resp = requests.post(
+            get_graphql_url(),
+            headers=get_headers(),
+            json={"query": mutation, "variables": variables}
+        )
+        resp.raise_for_status()
+        data   = resp.json()
+        errors = data.get('data', {}).get('metafieldsSet', {}).get('userErrors', [])
+        if errors:
+            return jsonify({'success': False, 'error': errors[0]['message']}), 400
+        return jsonify({'success': True, 'price': price_val})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 # ── Category product management routes ──────────────────────────────────────
 
 @app.route('/api/category_products/<slug>', methods=['GET'])
@@ -1665,96 +1765,95 @@ def generate_pdf():
     if not products:
         return jsonify({'success': False, 'error': 'No valid products found.'}), 404
 
-    # Generate PDF
+    # Generate PDF – 3×3 equal boxes per page with image + details
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter, leftMargin=0.4*inch, rightMargin=0.4*inch, topMargin=0.5*inch, bottomMargin=0.5*inch)
     elements = []
     styles = getSampleStyleSheet()
-    
-    # Custom styles
-    card_title_style = ParagraphStyle(
-        'CardTitle',
-        parent=styles['Normal'],
-        fontSize=9,
-        leading=10,
-        alignment=1, # Center
-        spaceAfter=2
-    )
-    
-    price_style = ParagraphStyle(
-        'PriceStyle',
-        parent=styles['Normal'],
-        fontSize=8,
-        leading=9,
-        alignment=1, # Center
-    )
 
-    # Grid settings
-    cols = 3
-    card_width = 2.4 * inch
-    
-    rows = []
-    current_row = []
-    
-    for p in products:
-        card_elements = []
-        
-        # Image
-        if p['image_url']:
-            try:
-                img_resp = requests.get(p['image_url'], timeout=10)
-                if img_resp.status_code == 200:
-                    img_data = io.BytesIO(img_resp.content)
-                    img = Image(img_data, width=1.6*inch, height=1.6*inch)
-                    img.hAlign = 'CENTER'
-                    card_elements.append(img)
+    def add_watermark(canvas, doc):
+        canvas.saveState()
+        canvas.setFillColor(colors.Color(0.5, 0.5, 0.5))
+        canvas.setFillAlpha(0.08)
+        canvas.setFont('Helvetica', 50)
+        canvas.translate(letter[0]/2, letter[1]/2)
+        canvas.rotate(30)
+        canvas.drawCentredString(0, 0, "Universal Shopify Tools")
+        canvas.restoreState()
+
+    title_style = ParagraphStyle('CT', parent=styles['Normal'], fontSize=8, leading=10, alignment=1, spaceAfter=2)
+    detail_style = ParagraphStyle('CD', parent=styles['Normal'], fontSize=7, leading=9, alignment=1)
+
+    # Account for default Frame padding (6pt each side) so the 3×3 table fits exactly
+    frame_pad = 6
+    avail_w = letter[0] - 0.8*inch - 2*frame_pad
+    avail_h = letter[1] - 1.0*inch - 2*frame_pad
+    col_w = avail_w / 3
+    row_h = avail_h / 3
+
+    for start in range(0, len(products), 9):
+        chunk = products[start:start + 9]
+        table_data = []
+        idx = 0
+        for r in range(3):
+            row = []
+            for c in range(3):
+                if idx < len(chunk):
+                    p = chunk[idx]
+                    inner = []
+
+                    # Image
+                    if p['image_url']:
+                        try:
+                            img_resp = requests.get(p['image_url'], timeout=10)
+                            if img_resp.status_code == 200:
+                                img_data = io.BytesIO(img_resp.content)
+                                img = Image(img_data, width=0.9*inch, height=0.9*inch)
+                                img.hAlign = 'CENTER'
+                                inner.append(img)
+                        except Exception:
+                            inner.append(Spacer(1, 0.9*inch))
+                    else:
+                        inner.append(Spacer(1, 0.9*inch))
+
+                    inner.append(Spacer(1, 4))
+                    inner.append(Paragraph(f"<b>{p['title']}</b>", title_style))
+                    inner.append(Paragraph(f"SKU: {p['sku']}", detail_style))
+                    inner.append(Spacer(1, 2))
+                    inner.append(Paragraph(f"Retail: <b>${p['retail_price']}</b>", detail_style))
+                    inner.append(Paragraph(f"Wholesale: <b>${p['wholesale_price']}</b>", detail_style))
+
+                    cell = Table([[e] for e in inner], colWidths=[col_w - 12])
+                    cell.setStyle(TableStyle([
+                        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                        ('TOPPADDING', (0,0), (-1,-1), 4),
+                        ('BOTTOMPADDING', (0,0), (-1,-1), 4),
+                    ]))
+                    row.append(cell)
                 else:
-                    card_elements.append(Spacer(1, 1.6*inch))
-            except Exception:
-                card_elements.append(Spacer(1, 1.6*inch))
-        else:
-            card_elements.append(Spacer(1, 1.6*inch))
-            
-        card_elements.append(Spacer(1, 6))
-        card_elements.append(Paragraph(f"<b>{p['title']}</b>", card_title_style))
-        card_elements.append(Paragraph(f"SKU: {p['sku']}", price_style))
-        card_elements.append(Spacer(1, 4))
-        card_elements.append(Paragraph(f"Retail: <b>${p['retail_price']}</b>", price_style))
-        card_elements.append(Paragraph(f"Wholesale: <b>${p['wholesale_price']}</b>", price_style))
-        
-        # Card table cell
-        card_table = Table([[e] for e in card_elements], colWidths=[card_width-0.2*inch])
-        card_table.setStyle(TableStyle([
-            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    row.append("")
+                idx += 1
+            table_data.append(row)
+
+        t = Table(table_data, colWidths=[col_w]*3, rowHeights=[row_h]*3)
+        t.setStyle(TableStyle([
+            ('BOX', (0,0), (-1,-1), 0.5, colors.Color(0.5,0.5,0.5,alpha=0.4)),
+            ('INNERGRID', (0,0), (-1,-1), 0.5, colors.Color(0.5,0.5,0.5,alpha=0.4)),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('BOX', (0,0), (-1,-1), 0.5, colors.lightgrey),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
             ('TOPPADDING', (0,0), (-1,-1), 6),
             ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+            ('LEFTPADDING', (0,0), (-1,-1), 6),
+            ('RIGHTPADDING', (0,0), (-1,-1), 6),
         ]))
-        
-        current_row.append(card_table)
-        
-        if len(current_row) == cols:
-            rows.append(current_row)
-            current_row = []
-            
-    if current_row:
-        while len(current_row) < cols:
-            current_row.append("")
-        rows.append(current_row)
-        
-    main_table = Table(rows, colWidths=[card_width]*cols)
-    main_table.setStyle(TableStyle([
-        ('VALIGN', (0,0), (-1,-1), 'TOP'),
-        ('LEFTPADDING', (0,0), (-1,-1), 4),
-        ('RIGHTPADDING', (0,0), (-1,-1), 4),
-        ('TOPPADDING', (0,0), (-1,-1), 8),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
-    ]))
-    
-    elements.append(main_table)
+        elements.append(t)
+
+        if start + 9 < len(products):
+            elements.append(PageBreak())
+
     try:
-        doc.build(elements)
+        doc.build(elements, onFirstPage=add_watermark, onLaterPages=add_watermark)
     except Exception as e:
         return jsonify({'success': False, 'error': f'PDF generation error: {str(e)}'}), 500
     

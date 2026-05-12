@@ -10,10 +10,9 @@
         const overlay = document.getElementById('settingsOverlay');
         if (!overlay) return;
         overlay.classList.add('open');
-        if (tab) {
-            const navItem = document.querySelector(`.sw-nav-item[onclick*="'${tab}'"]`);
-            switchTab(tab, navItem);
-        }
+        tab = tab || 'license';
+        const navItem = document.querySelector(`.sw-nav-item[onclick*="'${tab}'"]`);
+        switchTab(tab, navItem);
         _fetchSettingsInfo();
         _swFetchProfiles();
     };

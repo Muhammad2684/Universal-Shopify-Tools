@@ -348,6 +348,18 @@ body {
     background: rgba(233, 69, 96, 0.2);
 }
 
+.comment-del-btn {
+    background: none; border: none; cursor: pointer; padding: 2px 4px;
+    color: var(--text-dark); border-radius: 4px; transition: all 0.2s;
+    margin-left: 2px;
+}
+.comment-del-btn:hover {
+    color: var(--accent-color); background: rgba(233, 69, 96, 0.1);
+}
+.comment-del-btn svg {
+    display: block;
+}
+
 .comment-edit-btn svg {
     display: block;
     flex-shrink: 0;
@@ -472,4 +484,112 @@ body {
     .product-card img {
         height: 150px;
     }
+}
+
+/* ── Price Info ──────────────────────────────────────────────────────────── */
+.price-info {
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid var(--border-color);
+    font-size: 0.82em;
+    line-height: 1.6;
+}
+
+.price-label {
+    color: var(--text-dark);
+    margin-right: 4px;
+}
+
+.price-value {
+    color: var(--text-light);
+    font-weight: 600;
+}
+
+.retail-price {
+    color: var(--text-dark);
+    font-size: 0.9em;
+}
+
+.wholesale-price {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.price-edit-btn,
+.price-add-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 4px;
+    color: var(--text-dark);
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.price-edit-btn:hover,
+.price-add-btn:hover {
+    color: var(--accent-color);
+    background: rgba(233, 69, 96, 0.1);
+}
+
+.price-add-btn {
+    font-size: 0.85em;
+    color: var(--accent-color);
+    border: 1px dashed var(--accent-color);
+    padding: 2px 8px;
+}
+
+.price-edit {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.price-input {
+    width: 80px;
+    padding: 3px 6px;
+    border: 1px solid var(--input-border);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text-light);
+    font-size: 0.85em;
+}
+
+.price-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.price-actions {
+    display: inline-flex;
+    gap: 4px;
+}
+
+.price-save-btn,
+.price-cancel-btn {
+    padding: 3px 10px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8em;
+    font-weight: 600;
+    transition: opacity 0.2s;
+}
+
+.price-save-btn {
+    background: var(--accent-color);
+    color: #fff;
+}
+
+.price-cancel-btn {
+    background: var(--item-bg);
+    color: var(--text-dark);
+}
+
+.price-save-btn:hover,
+.price-cancel-btn:hover {
+    opacity: 0.85;
 }

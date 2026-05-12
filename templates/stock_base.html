@@ -173,29 +173,33 @@
         })();
 
         // Product comment editing functions
+        function _commentDiv(productId) {
+            return document.querySelector(`.product-comment[data-product-id="${productId}"]`);
+        }
+
         function editComment(productId) {
-            const commentDiv = document.querySelector(`[data-product-id="${productId}"]`);
+            const commentDiv = _commentDiv(productId);
+            if (!commentDiv) return;
             const displayDiv = commentDiv.querySelector('.comment-display');
             const editDiv = commentDiv.querySelector('.comment-edit');
 
             displayDiv.style.display = 'none';
             editDiv.style.display = 'flex';
 
-            // Focus the textarea
             const textarea = editDiv.querySelector('.comment-input');
             textarea.focus();
             textarea.select();
         }
 
         function cancelComment(productId) {
-            const commentDiv = document.querySelector(`[data-product-id="${productId}"]`);
+            const commentDiv = _commentDiv(productId);
+            if (!commentDiv) return;
             const displayDiv = commentDiv.querySelector('.comment-display');
             const editDiv = commentDiv.querySelector('.comment-edit');
 
             displayDiv.style.display = 'flex';
             editDiv.style.display = 'none';
 
-            // Reset textarea to original value
             const textarea = editDiv.querySelector('.comment-input');
             const originalText = displayDiv.querySelector('.comment-text');
             if (originalText) {
@@ -206,7 +210,7 @@
         }
 
         async function saveComment(productId, clear = false) {
-            const commentDiv = document.querySelector(`[data-product-id="${productId}"]`);
+            const commentDiv = _commentDiv(productId);
             const editDiv = commentDiv.querySelector('.comment-edit');
             const textarea = editDiv.querySelector('.comment-input');
             const newComment = clear ? '' : textarea.value.trim();
@@ -257,6 +261,12 @@
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                                 </svg>
                             </button>
+                            <button class="comment-del-btn" onclick="deleteComment('${productId}')" title="Delete note">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                            </button>
                         `;
                         }
                         // Hide edit mode
@@ -272,6 +282,102 @@
             } catch (error) {
                 showStatus('Error saving comment: ' + error.message, 'error');
             }
+        }
+
+        // Wholesale price editing functions
+        function editWholesalePrice(productId) {
+            const priceDiv = document.querySelector(`.wholesale-price[data-product-id="${productId}"]`);
+            const displayEl = priceDiv.querySelector('.price-value, .price-add-btn');
+            const editEl = priceDiv.querySelector('.price-edit');
+
+            if (displayEl) displayEl.style.display = 'none';
+            const editBtn = priceDiv.querySelector('.price-edit-btn');
+            if (editBtn) editBtn.style.display = 'none';
+            const addBtn = priceDiv.querySelector('.price-add-btn');
+            if (addBtn) addBtn.style.display = 'none';
+            editEl.style.display = 'inline-flex';
+            editEl.querySelector('.price-input').focus();
+        }
+
+        function cancelWholesalePrice(productId) {
+            const priceDiv = document.querySelector(`.wholesale-price[data-product-id="${productId}"]`);
+            const editEl = priceDiv.querySelector('.price-edit');
+            editEl.style.display = 'none';
+
+            const displayEl = priceDiv.querySelector('.price-value');
+            const editBtn = priceDiv.querySelector('.price-edit-btn');
+            const addBtn = priceDiv.querySelector('.price-add-btn');
+            if (displayEl) displayEl.style.display = '';
+            if (editBtn) editBtn.style.display = '';
+            if (addBtn) addBtn.style.display = '';
+        }
+
+        async function saveWholesalePrice(productId) {
+            const priceDiv = document.querySelector(`.wholesale-price[data-product-id="${productId}"]`);
+            const input = priceDiv.querySelector('.price-input');
+            const newPrice = input.value.trim();
+
+            try {
+                const response = await fetch('/api/update_wholesale_price', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        product_id: productId,
+                        price: newPrice
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const editEl = priceDiv.querySelector('.price-edit');
+                    editEl.style.display = 'none';
+
+                    if (result.price && result.price !== '') {
+                        priceDiv.innerHTML = `
+                            <span class="price-label">Wholesale:</span>
+                            <span class="price-value">$${result.price}</span>
+                            <button class="price-edit-btn" onclick="editWholesalePrice('${productId}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <div class="price-edit" style="display: none;">
+                                <input type="number" step="0.01" min="0" class="price-input" value="${result.price}" placeholder="0.00">
+                                <div class="price-actions">
+                                    <button class="price-save-btn" onclick="saveWholesalePrice('${productId}')">Save</button>
+                                    <button class="price-cancel-btn" onclick="cancelWholesalePrice('${productId}')">Cancel</button>
+                                </div>
+                            </div>
+                        `;
+                        showStatus('Wholesale price updated', 'success');
+                    } else {
+                        priceDiv.innerHTML = `
+                            <span class="price-label">Wholesale:</span>
+                            <button class="price-add-btn" onclick="editWholesalePrice('${productId}')">+ Set Wholesale</button>
+                            <div class="price-edit" style="display: none;">
+                                <input type="number" step="0.01" min="0" class="price-input" placeholder="0.00">
+                                <div class="price-actions">
+                                    <button class="price-save-btn" onclick="saveWholesalePrice('${productId}')">Save</button>
+                                    <button class="price-cancel-btn" onclick="cancelWholesalePrice('${productId}')">Cancel</button>
+                                </div>
+                            </div>
+                        `;
+                        showStatus('Wholesale price removed', 'success');
+                    }
+                } else {
+                    showStatus('Failed to update price: ' + result.error, 'error');
+                }
+            } catch (error) {
+                showStatus('Error updating price: ' + error.message, 'error');
+            }
+        }
+
+        function deleteComment(productId) {
+            window.CustomModal.confirm('Remove Note', 'Are you sure you want to remove the note from this product?', function (ok) {
+                if (ok) saveComment(productId, true);
+            });
         }
 
         function showStatus(message, type) {
