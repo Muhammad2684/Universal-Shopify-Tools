@@ -1,5 +1,5 @@
 {
-  "version": "1.3.0",
-  "notes": "Wholesale price editing, comment delete, 3x3 PDF with watermark, settings fix, category delete removes product tags, N/A comment hiding",
-  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.0/USHT.exe"
+  "version": "1.3.1",
+  "notes": "Fix: changing category parent to top-level no longer silently fails to persist",
+  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.1/USHT.exe"
 }

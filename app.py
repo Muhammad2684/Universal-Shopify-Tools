@@ -143,7 +143,7 @@ def credentials_ok():
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.3.1"
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
 
 _update_state = {"status": "idle", "percent": 0, "error": ""}
@@ -1040,9 +1040,10 @@ def api_update_category(slug):
     cat['tag']   = body.get('tag',   cat['tag']).strip()
     
     # Handle parent update
-    parent = body.get('parent')
-    if parent is not None:
-        parent = parent.strip() or None
+    if 'parent' in body:
+        parent = body.get('parent')
+        if parent is not None:
+            parent = parent.strip() or None
         if parent:
             # Validate parent exists and is not self
             if parent == slug:
