@@ -152,7 +152,7 @@ def auth_start():
         shop = shop + '.myshopify.com'
     state = secrets.token_hex(16)
     session['oauth_state'] = state
-    redirect_uri = 'https://usht.pythonanywhere.com/auth/callback'
+    redirect_uri = 'https://usht-web.onrender.com/auth/callback'
     url = (
         f"https://{shop}/admin/oauth/authorize"
         f"?client_id={SHOPIFY_CLIENT_ID}"
