@@ -402,7 +402,7 @@ def fetch_order_data(order_identifier):
 
 @app.before_request
 def check_license():
-    allowed = ['/license', '/api/license/validate', '/api/license/clear', '/static']
+    allowed = ['/license', '/api/license/validate', '/api/license/clear', '/static', '/auth', '/auth/callback']
     if any(request.path.startswith(p) for p in allowed):
         return None
     lic = load_license()
