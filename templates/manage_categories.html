@@ -236,11 +236,13 @@
                 <div class="field-group">
                     <span class="field-label">Parent Category</span>
                     <select class="cat-input" id="newParent">
-                        <option value="">-- None (top-level) --</option>
+                        <option value="">Parent</option>
                     </select>
                     <span class="field-hint">Leave blank to create a top-level category</span>
                 </div>
-                <button class="btn-add-cat" onclick="addCategory()">+ Add Category</button>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-add-cat" onclick="openAddProducts()" style="flex:1;">+ Add Products</button>
+                </div>
                 <div class="add-status" id="addStatus"></div>
             </div>
         </div>
@@ -259,8 +261,8 @@
                 </div>
             </div>
             <div class="pm-tabs">
-                <button class="pm-tab active" id="tabIn"  onclick="switchTab('in')">In Category</button>
-                <button class="pm-tab"        id="tabAdd" onclick="switchTab('add')">Add Products</button>
+                <button class="pm-tab active" id="tabIn">In Category</button>
+                <button class="pm-tab" id="tabAdd">Add Products</button>
             </div>
         </div>
         <div class="pm-search-wrap" id="pmSearchWrap" style="display:none;">
@@ -270,7 +272,7 @@
         <div class="pm-list" id="pmList"><div class="pm-state">Loading...</div></div>
         <div class="pm-footer">
             <span class="pm-footer-info" id="pmFooterInfo"></span>
-            <button class="btn-pm-close" onclick="closePmModal()">Done</button>
+            <button class="btn-pm-close" onclick="addCategoryFromModal()">+ Add Category</button>
         </div>
     </div>
 </div>
@@ -286,7 +288,7 @@ document.getElementById('newTitle').addEventListener('input', function() {
 function updateParentOptions() {
     var sel = document.getElementById('newParent');
     if (!sel) return;
-    sel.innerHTML = '<option value="">-- None (top-level) --</option>';
+    sel.innerHTML = '<option value="">Parent</option>';
     _cats.forEach(function(c) {
         sel.innerHTML += '<option value="' + esc(c.slug) + '">' + esc(c.title) + '</option>';
     });
@@ -328,7 +330,7 @@ function buildCatRow(cat) {
 }
 
 function buildParentOptions(currentSlug) {
-    var opts = '<option value="">-- None (top-level) --</option>';
+    var opts = '<option value="">Parent</option>';
     _cats.forEach(function(c) {
         if (c.slug !== currentSlug) {
             opts += '<option value="' + esc(c.slug) + '">' + esc(c.title) + '</option>';
@@ -384,11 +386,23 @@ async function saveCat(slug) {
     } catch(e) { status.textContent='Network error'; status.className='cat-status err'; }
 }
 async function deleteCategory(slug) {
-    window.CustomModal.confirm('Delete Category', 'Delete this category? Shopify products are not affected.', async (ok) => {
+    window.CustomModal.confirm('Delete Category', 'Delete this category and remove its tag from all products? Sub-categories will also be removed.', async (ok) => {
         if (!ok) return;
         try {
             var res=await fetch('/api/stock_categories/'+slug,{method:'DELETE'}), data=await res.json();
-            if (data.success) { _cats=_cats.filter(function(c){return c.slug!==slug;}); renderCats(); }
+            if (data.success) {
+                // Remove this category and any sub-categories from the local list
+                var removedSlugs = [slug];
+                _cats.forEach(function(c) {
+                    if (c.parent === slug) removedSlugs.push(c.slug);
+                });
+                _cats = _cats.filter(function(c) { return removedSlugs.indexOf(c.slug) === -1; });
+                renderCats();
+                updateParentOptions();
+                if (data.products_updated > 0) {
+                    window.CustomModal.alert('Deleted', 'Category deleted. Tag removed from ' + data.products_updated + ' product(s).');
+                }
+            }
         } catch(e) {}
     });
 }
@@ -403,11 +417,7 @@ async function addCategory() {
         var res=await fetch('/api/stock_categories',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,tag,slug,parent})});
         var data=await res.json();
         if (data.success) {
-            ['newTitle','newTag','newSlug'].forEach(function(id){document.getElementById(id).value='';});
-            document.getElementById('newParent').value = '';
-            status.textContent='Category added!'; status.className='add-status ok';
-            setTimeout(function(){status.textContent='';},3000);
-            _cats.push({slug,title,tag,parent}); renderCats(); updateParentOptions();
+            location.reload();
         }
     } catch(e) { status.textContent='Network error'; status.className='add-status err'; }
 }
@@ -428,12 +438,24 @@ function closePmModal() { document.getElementById('pmOverlay').classList.remove(
 function handlePmOverlay(e) { if (e.target===document.getElementById('pmOverlay')) closePmModal(); }
 
 function switchTab(tab) {
-    _pmTab = tab;
-    document.getElementById('tabIn').classList.toggle('active',  tab==='in');
-    document.getElementById('tabAdd').classList.toggle('active', tab==='add');
-    document.getElementById('pmSearchWrap').style.display = tab==='add' ? 'block' : 'none';
-    if (tab==='in') { loadInCategory(); }
-    else { document.getElementById('pmList').innerHTML='<div class="pm-state">Search for products to add</div>'; document.getElementById('pmFooterInfo').textContent=''; setTimeout(function(){document.getElementById('pmSearchInput').focus();},80); }
+    try {
+        _pmTab = tab;
+        var tabIn = document.getElementById('tabIn');
+        var tabAdd = document.getElementById('tabAdd');
+        if (tab === 'in') {
+            tabIn.classList.add('active');
+            tabAdd.classList.remove('active');
+            document.getElementById('pmSearchWrap').style.display = 'none';
+            loadInCategory();
+        } else {
+            tabIn.classList.remove('active');
+            tabAdd.classList.add('active');
+            document.getElementById('pmSearchWrap').style.display = 'block';
+            document.getElementById('pmList').innerHTML = '<div class="pm-state">Search for products to add</div>';
+            document.getElementById('pmFooterInfo').textContent = '';
+            setTimeout(function () { document.getElementById('pmSearchInput').focus(); }, 80);
+        }
+    } catch (e) { console.error('switchTab error:', e); }
 }
 
 async function loadInCategory() {
@@ -586,22 +608,124 @@ async function addProd(numericId, title, btn) {
     } catch(e) { btn.disabled=false; btn.textContent='Add'; }
 }
 async function removeProd(numericId, title, btn) {
-    if (!confirm('Remove "'+title+'" from this category?')) return;
-    btn.disabled=true; btn.textContent='...';
-    try {
-        var res=await fetch('/api/category_product',{method:'DELETE',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id:numericId,tag:_pmTag})});
-        var data=await res.json();
-        if (data.success) {
-            var row=document.getElementById('pmrow-'+numericId);
-            if (row) row.remove();
-            _pmInProds=_pmInProds.filter(function(p){return p.id.split('/').pop()!==numericId;});
-            document.getElementById('pmFooterInfo').textContent=_pmInProds.length+' product(s) in this category';
-            if (!_pmInProds.length) document.getElementById('pmList').innerHTML='<div class="pm-state">No products in this category yet</div>';
-        } else { btn.disabled=false; btn.textContent='Remove'; alert('Error: '+data.error); }
-    } catch(e) { btn.disabled=false; btn.textContent='Remove'; }
+    window.CustomModal.confirm('Remove Product', 'Remove "' + title + '" from this category?', function(ok) {
+        if (!ok) return;
+        btn.disabled = true;
+        btn.textContent = '...';
+        (async function () {
+            try {
+                var res = await fetch('/api/category_product', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product_id: numericId, tag: _pmTag }) });
+                var data = await res.json();
+                if (data.success) {
+                    var row = document.getElementById('pmrow-' + numericId);
+                    if (row) row.remove();
+                    _pmInProds = _pmInProds.filter(function (p) { return p.id.split('/').pop() !== numericId; });
+                    document.getElementById('pmFooterInfo').textContent = _pmInProds.length + ' product(s) in this category';
+                    if (!_pmInProds.length) document.getElementById('pmList').innerHTML = '<div class="pm-state">No products in this category yet</div>';
+                } else { btn.disabled = false; btn.textContent = 'Remove'; window.CustomModal.alert('Error', data.error); }
+            } catch (e) { btn.disabled = false; btn.textContent = 'Remove'; }
+        })();
+    });
 }
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function addCategoryFromModal() {
+    var title = document.getElementById('newTitle').value.trim();
+    var tag = document.getElementById('newTag').value.trim();
+    var slug = document.getElementById('newSlug').value.trim();
+    var parent = document.getElementById('newParent').value || null;
+    var status = document.getElementById('addStatus');
+
+    if (!title || !tag || !slug) {
+        status.textContent = 'Fill in name, tag, and slug first';
+        status.className = 'add-status err';
+        return;
+    }
+
+    status.textContent = 'Creating category...';
+    status.className = 'add-status';
+
+    fetch('/api/stock_categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title, tag: tag, slug: slug, parent: parent })
+    })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+        if (data.success) {
+            document.getElementById('newTitle').value = '';
+            document.getElementById('newTag').value = '';
+            document.getElementById('newSlug').value = '';
+            document.getElementById('newParent').value = '';
+            status.textContent = '';
+            closePmModal();
+            _cats.push({ slug: slug, title: title, tag: tag, parent: parent });
+            renderCats();
+            updateParentOptions();
+        } else {
+            status.textContent = data.error || 'Failed';
+            status.className = 'add-status err';
+        }
+    })
+    .catch(function () {
+        status.textContent = 'Network error';
+        status.className = 'add-status err';
+    });
+}
+
+function openAddProducts() {
+    var title = document.getElementById('newTitle').value.trim();
+    var tag = document.getElementById('newTag').value.trim();
+    var slug = document.getElementById('newSlug').value.trim();
+    var status = document.getElementById('addStatus');
+
+    if (!title || !tag || !slug) {
+        status.textContent = 'Fill in name, tag, and slug first';
+        status.className = 'add-status err';
+        return;
+    }
+
+    status.textContent = '';
+    _pmSlug = slug; _pmTag = tag; _pmTab = 'add';
+    document.getElementById('pmTitle').textContent = title + ' — Products';
+    document.getElementById('pmCatTag').textContent = tag;
+    document.getElementById('pmSearchInput').value = '';
+    document.getElementById('pmSearchWrap').style.display = 'block';
+    document.getElementById('tabIn').classList.remove('active');
+    document.getElementById('tabAdd').classList.add('active');
+    document.getElementById('pmOverlay').classList.add('open');
+    document.getElementById('pmList').innerHTML = '<div class="pm-state">Search for products to add</div>';
+    document.getElementById('pmFooterInfo').textContent = '';
+    setTimeout(function () { document.getElementById('pmSearchInput').focus(); }, 80);
+}
+
+// Tab button handlers — addEventListener only (no onclick attributes)
+(function () {
+    function handler(tab) {
+        return function (e) {
+            _pmTab = tab;
+            var tabIn = document.getElementById('tabIn');
+            var tabAdd = document.getElementById('tabAdd');
+            if (!tabIn || !tabAdd) return;
+            tabIn.classList.remove('active');
+            tabAdd.classList.remove('active');
+            (tab === 'in' ? tabIn : tabAdd).classList.add('active');
+            document.getElementById('pmSearchWrap').style.display = tab === 'add' ? 'block' : 'none';
+            if (tab === 'in') {
+                loadInCategory();
+            } else {
+                document.getElementById('pmList').innerHTML = '<div class="pm-state">Search for products to add</div>';
+                document.getElementById('pmFooterInfo').textContent = '';
+                setTimeout(function () { document.getElementById('pmSearchInput').focus(); }, 80);
+            }
+        };
+    }
+    var tabIn = document.getElementById('tabIn');
+    var tabAdd = document.getElementById('tabAdd');
+    if (tabIn) tabIn.addEventListener('click', handler('in'));
+    if (tabAdd) tabAdd.addEventListener('click', handler('add'));
+})();
 
 loadCats();
 </script>

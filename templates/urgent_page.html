@@ -24,7 +24,7 @@
                 <h5>{{ product.title }}</h5>
                 <div class="needed-qty">Needed: {{ product.needed_qty }}</div>
                 <div class="stock-info">Current Stock: {{ product.current_qty }}</div>
-                {% if product.comment %}
+                {% if product.comment and product.comment != "N/A" %}
                     <div class="product-comment" data-product-id="{{ product.product_id }}">
                         <div class="comment-display">
                             <strong>Note:</strong> <span class="comment-text">{{ product.comment }}</span>
@@ -32,6 +32,12 @@
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                            <button class="comment-del-btn" onclick="deleteComment('{{ product.product_id }}')" title="Delete note">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                                 </svg>
                             </button>
                         </div>
@@ -57,6 +63,35 @@
                         </div>
                     </div>
                 {% endif %}
+                <div class="price-info">
+                    <div class="wholesale-price" data-product-id="{{ product.product_id }}">
+                        <span class="price-label">Wholesale:</span>
+                        {% if product.wholesale_price and product.wholesale_price != '0.00' %}
+                            <span class="price-value">${{ product.wholesale_price }}</span>
+                            <button class="price-edit-btn" onclick="editWholesalePrice('{{ product.product_id }}')">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                            </button>
+                        {% else %}
+                            <button class="price-add-btn" onclick="editWholesalePrice('{{ product.product_id }}')">+ Set Wholesale</button>
+                        {% endif %}
+                        <div class="price-edit" style="display: none;">
+                            <input type="number" step="0.01" min="0" class="price-input"
+                                   value="{{ product.wholesale_price if product.wholesale_price and product.wholesale_price != '0.00' else '' }}"
+                                   placeholder="0.00">
+                            <div class="price-actions">
+                                <button class="price-save-btn" onclick="saveWholesalePrice('{{ product.product_id }}')">Save</button>
+                                <button class="price-cancel-btn" onclick="cancelWholesalePrice('{{ product.product_id }}')">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="retail-price">
+                        <span class="price-label">Retail:</span>
+                        <span class="price-value">${{ product.retail_price }}</span>
+                    </div>
+                </div>
             </div>
         </div>
     {% else %}

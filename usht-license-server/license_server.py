@@ -2,6 +2,7 @@ import os
 import json
 import random
 import string
+import sqlite3
 from datetime import datetime, timedelta
 from functools import wraps
 from flask import Flask, request, jsonify, render_template_string, redirect, url_for, session
@@ -10,7 +11,38 @@ app = Flask(__name__)
 app.secret_key = 'USHT#SECRET#2024'
 
 ADMIN_PASSWORD = 'USHT#ADMIN'
-KEYS_FILE      = 'keys.json'
+DB_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'keys.db')
+
+def get_db():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_db() as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS keys (
+                key                TEXT PRIMARY KEY,
+                plan               TEXT NOT NULL,
+                customer           TEXT DEFAULT '',
+                revoked            INTEGER DEFAULT 0,
+                free_trial         INTEGER DEFAULT 0,
+                created_at         TEXT,
+                expires_at         TEXT,
+                last_seen          TEXT,
+                last_ip            TEXT,
+                usage_count        INTEGER DEFAULT 0,
+                has_sap            INTEGER DEFAULT 1,
+                has_map            INTEGER DEFAULT 1,
+                has_mar            INTEGER DEFAULT 1,
+                has_qty_deduction  INTEGER DEFAULT 1,
+                has_accountant     INTEGER DEFAULT 1,
+                has_stock_app      INTEGER DEFAULT 1
+            )
+        ''')
+        conn.commit()
+
+init_db()
 
 PLANS = {
     'BASIC':    {'label': 'Basic',    'monthly': True,  'price': 'Rs. 2,000/month'},
@@ -18,18 +50,45 @@ PLANS = {
     'LIFETIME': {'label': 'Lifetime', 'monthly': False, 'price': 'Rs. 30,000'},
 }
 
-def load_keys():
-    if not os.path.exists(KEYS_FILE):
-        return {}
-    try:
-        with open(KEYS_FILE, 'r') as f:
-            return json.load(f)
-    except Exception:
-        return {}
+def row_to_dict(row):
+    if row is None:
+        return None
+    d = dict(row)
+    for field in ('revoked', 'free_trial', 'has_sap', 'has_map', 'has_mar',
+                  'has_qty_deduction', 'has_accountant', 'has_stock_app'):
+        d[field] = bool(d.get(field, 1))
+    return d
 
-def save_keys(keys):
-    with open(KEYS_FILE, 'w') as f:
-        json.dump(keys, f, indent=2)
+def load_keys():
+    with get_db() as conn:
+        rows = conn.execute('SELECT * FROM keys').fetchall()
+    return {row['key']: row_to_dict(row) for row in rows}
+
+def get_key(key):
+    with get_db() as conn:
+        row = conn.execute('SELECT * FROM keys WHERE key = ?', (key,)).fetchone()
+    return row_to_dict(row)
+
+def save_key(key, entry):
+    with get_db() as conn:
+        conn.execute('''
+            INSERT INTO keys (key, plan, customer, revoked, free_trial, created_at,
+                expires_at, last_seen, last_ip, usage_count,
+                has_sap, has_map, has_mar, has_qty_deduction, has_accountant, has_stock_app)
+            VALUES (:key, :plan, :customer, :revoked, :free_trial, :created_at,
+                :expires_at, :last_seen, :last_ip, :usage_count,
+                :has_sap, :has_map, :has_mar, :has_qty_deduction, :has_accountant, :has_stock_app)
+            ON CONFLICT(key) DO UPDATE SET
+                plan=excluded.plan, customer=excluded.customer,
+                revoked=excluded.revoked, free_trial=excluded.free_trial,
+                created_at=excluded.created_at, expires_at=excluded.expires_at,
+                last_seen=excluded.last_seen, last_ip=excluded.last_ip,
+                usage_count=excluded.usage_count,
+                has_sap=excluded.has_sap, has_map=excluded.has_map,
+                has_mar=excluded.has_mar, has_qty_deduction=excluded.has_qty_deduction,
+                has_accountant=excluded.has_accountant, has_stock_app=excluded.has_stock_app
+        ''', {**entry, 'key': key})
+        conn.commit()
 
 def generate_key(plan):
     chars = string.ascii_uppercase + string.digits
@@ -51,14 +110,13 @@ def validate():
     key  = (body.get('key') or '').strip().upper()
     if not key:
         return jsonify({'valid': False, 'error': 'No key provided'}), 400
-    keys = load_keys()
-    if key not in keys:
+    entry = get_key(key)
+    if not entry:
         return jsonify({'valid': False, 'error': 'Invalid license key'}), 200
-    entry = keys[key]
     entry['last_seen']   = datetime.utcnow().isoformat()
     entry['last_ip']     = request.headers.get('X-Forwarded-For', request.remote_addr or 'unknown').split(',')[0].strip()
     entry['usage_count'] = entry.get('usage_count', 0) + 1
-    save_keys(keys)
+    save_key(key, entry)
     if entry.get('revoked'):
         return jsonify({'valid': False, 'error': 'Invalid license key'}), 200
     if entry.get('expires_at'):
@@ -87,10 +145,9 @@ def get_permissions():
     key  = (body.get('key') or '').strip().upper()
     if not key:
         return jsonify({'error': 'No key provided'}), 400
-    keys = load_keys()
-    if key not in keys:
+    entry = get_key(key)
+    if not entry:
         return jsonify({'error': 'Invalid license key'}), 404
-    entry = keys[key]
     return jsonify({
         'has_sap': entry.get('has_sap', True),
         'has_map': entry.get('has_map', True),
@@ -336,7 +393,6 @@ def admin_generate():
     if plan not in PLANS:
         return jsonify({'error': 'Invalid plan'}), 400
     key   = generate_key(plan)
-    keys  = load_keys()
     entry = {
         'plan': plan, 'customer': customer, 'revoked': False, 'free_trial': False,
         'created_at': datetime.utcnow().isoformat(), 'expires_at': None,
@@ -350,32 +406,31 @@ def admin_generate():
     }
     if PLANS[plan]['monthly']:
         entry['expires_at'] = (datetime.utcnow() + timedelta(days=30)).isoformat()
-    keys[key] = entry
-    save_keys(keys)
+    save_key(key, entry)
     return jsonify({'key': key})
 
 @app.route('/admin/revoke', methods=['POST'])
 @login_required
 def admin_revoke():
-    key  = request.form.get('key', '').strip()
-    keys = load_keys()
-    if key in keys:
-        keys[key]['revoked']    = True
-        keys[key]['free_trial'] = False
-        save_keys(keys)
+    key   = request.form.get('key', '').strip()
+    entry = get_key(key)
+    if entry:
+        entry['revoked']    = True
+        entry['free_trial'] = False
+        save_key(key, entry)
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/restore', methods=['POST'])
 @login_required
 def admin_restore():
-    key  = request.form.get('key', '').strip()
-    keys = load_keys()
-    if key in keys:
-        keys[key]['revoked']    = False
-        keys[key]['free_trial'] = False
-        if PLANS[keys[key]['plan']]['monthly']:
-            keys[key]['expires_at'] = (datetime.utcnow() + timedelta(days=30)).isoformat()
-        save_keys(keys)
+    key   = request.form.get('key', '').strip()
+    entry = get_key(key)
+    if entry:
+        entry['revoked']    = False
+        entry['free_trial'] = False
+        if PLANS[entry['plan']]['monthly']:
+            entry['expires_at'] = (datetime.utcnow() + timedelta(days=30)).isoformat()
+        save_key(key, entry)
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/set_state', methods=['POST'])
@@ -383,11 +438,11 @@ def admin_restore():
 def admin_set_state():
     key   = request.form.get('key', '').strip()
     state = request.form.get('state', '').strip()
-    keys  = load_keys()
-    if key in keys:
-        keys[key]['free_trial'] = (state == 'free_trial')
-        keys[key]['revoked']    = False
-        save_keys(keys)
+    entry = get_key(key)
+    if entry:
+        entry['free_trial'] = (state == 'free_trial')
+        entry['revoked']    = False
+        save_key(key, entry)
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/update_flags', methods=['POST'])
@@ -396,12 +451,12 @@ def admin_update_flags():
     body  = request.get_json(silent=True) or {}
     key   = body.get('key', '').strip()
     flags = body.get('flags', {})
-    keys  = load_keys()
-    if key in keys:
+    entry = get_key(key)
+    if entry:
         for field, value in flags.items():
             if field in ['has_sap', 'has_map', 'has_mar', 'has_qty_deduction', 'has_accountant', 'has_stock_app']:
-                keys[key][field] = bool(value)
-        save_keys(keys)
+                entry[field] = bool(value)
+        save_key(key, entry)
         return jsonify({'success': True})
     return jsonify({'success': False}), 400
 

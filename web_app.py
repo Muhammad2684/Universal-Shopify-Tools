@@ -1,13 +1,10 @@
 import os
-import sys
 import json
-import threading
 import requests
 import datetime
 import csv
 from flask import Flask, render_template, jsonify, request, abort, redirect, url_for, send_file
 import io
-import webview
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -19,18 +16,10 @@ from flask import session
 from dotenv import load_dotenv  
 load_dotenv()
 
-# ── PyInstaller path resolution ──────────────────────────────────────────────
-if getattr(sys, 'frozen', False):
-    TEMPLATE_DIR = os.path.join(sys._MEIPASS, 'templates')
-    STATIC_DIR   = os.path.join(sys._MEIPASS, 'static')
-    app = Flask(__name__, template_folder=TEMPLATE_DIR, static_folder=STATIC_DIR)
-else:
-    app = Flask(__name__)
+app = Flask(__name__)
+app.secret_key = 'replace-with-random-32-char-string'
 
-if sys.platform == "win32":
-    BASE_DIR = os.path.join(os.environ.get('APPDATA'), 'UniversalSHTools')
-else:
-    BASE_DIR = os.path.join(os.path.expanduser('~'), '.UniversalSHTools')
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
 os.makedirs(BASE_DIR, exist_ok=True)
 
@@ -149,8 +138,6 @@ def credentials_ok():
 # Shopify Auth
 # ════════════════════════════════════════════════════════════════════════════
 
-app.secret_key = '7xK9pM2wQfB4vR8zYtN1sX6jC5dK3mLa'
-
 SHOPIFY_CLIENT_ID     = os.environ.get('SHOPIFY_CLIENT_ID', '')
 SHOPIFY_CLIENT_SECRET = os.environ.get('SHOPIFY_CLIENT_SECRET', '')
 SHOPIFY_SCOPES        = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments,read_locations'
@@ -204,134 +191,6 @@ def auth_callback():
     <p>Token: {access_token}</p>
     <p>Save this token — we'll store it properly in the next step.</p>
     """
-# ════════════════════════════════════════════════════════════════════════════
-# VERSION / AUTO-UPDATE
-# ════════════════════════════════════════════════════════════════════════════
-
-APP_VERSION = "1.3.1"
-VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
-
-_update_state = {"status": "idle", "percent": 0, "error": ""}
-
-
-@app.route('/api/check_update', methods=['GET'])
-def check_update():
-    try:
-        resp = requests.get(VERSION_URL, timeout=5)
-        resp.raise_for_status()
-        remote         = resp.json()
-        remote_version = remote.get("version", "0.0.0")
-        notes          = remote.get("notes", "")
-        download_url   = remote.get("download", "")
-
-        def parse(v):
-            try:    return tuple(int(x) for x in str(v).strip().split('.'))
-            except: return (0, 0, 0)
-
-        return jsonify({
-            "current_version":  APP_VERSION,
-            "remote_version":   remote_version,
-            "update_available": parse(remote_version) > parse(APP_VERSION),
-            "notes":            notes,
-            "download_url":     download_url,
-        })
-    except Exception as e:
-        return jsonify({
-            "current_version":  APP_VERSION,
-            "remote_version":   None,
-            "update_available": False,
-            "error":            str(e),
-        })
-
-
-@app.route('/api/update_progress', methods=['GET'])
-def update_progress():
-    return jsonify(_update_state)
-
-
-@app.route('/api/do_update', methods=['POST'])
-def do_update():
-    global _update_state
-
-    body         = request.get_json(silent=True) or {}
-    download_url = body.get("download_url", "").strip()
-
-    if not download_url:
-        return jsonify({"success": False, "error": "No download URL provided"}), 400
-
-    if not getattr(sys, 'frozen', False):
-        return jsonify({
-            "success": False,
-            "error":   "Auto-update only works in the packaged .exe. In dev mode, update manually."
-        }), 400
-
-    _update_state = {"status": "downloading", "percent": 0, "error": ""}
-
-    current_exe = sys.executable
-    exe_dir     = os.path.dirname(current_exe)
-    new_exe     = os.path.join(exe_dir, "_update_new.exe")
-
-    def _run():
-        global _update_state
-        import subprocess, time
-        try:
-            # ── 1. Download with progress ─────────────────────────────────
-            with requests.get(download_url, stream=True, timeout=120) as r:
-                r.raise_for_status()
-                total    = int(r.headers.get('Content-Length', 0))
-                received = 0
-                with open(new_exe, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=65536):
-                        if chunk:
-                            f.write(chunk)
-                            received += len(chunk)
-                            if total:
-                                _update_state["percent"] = int(received / total * 100)
-
-            _update_state["status"]  = "swapping"
-            _update_state["percent"] = 100
-
-            # ── 2. Find bundled swap.bat next to the exe ──────────────────
-            bat_path = os.path.join(exe_dir, 'swap.bat')
-            if not os.path.exists(bat_path):
-                _update_state["status"] = "error"
-                _update_state["error"]  = "swap.bat not found next to exe"
-                return
-
-            # Write _MEI path so bat can wait for it to be cleaned up
-            mei_folder = getattr(sys, '_MEIPASS', '')
-            mei_file = os.path.join(exe_dir, '_mei_path.txt')
-            with open(mei_file, 'w') as f:
-                f.write(mei_folder)
-
-            # ── 3. Launch swap.bat detached ───────────────────────────────
-            subprocess.Popen(
-                ['cmd.exe', '/c', bat_path],
-                close_fds=True
-            )
-
-            # Give bat time to fully start before we exit
-            time.sleep(3.0)
-
-            _update_state["status"] = "done"
-            time.sleep(0.5)
-
-            # ── 4. Close webview gracefully so PyInstaller cleans up _MEI ─
-            import webview
-            try:
-                for w in webview.windows:
-                    w.destroy()
-            except Exception:
-                os._exit(0)
-
-        except Exception as e:
-            _update_state["status"] = "error"
-            _update_state["error"]  = str(e)
-            print(f"[UPDATER] Failed: {e}")
-
-    threading.Thread(target=_run, daemon=True).start()
-    return jsonify({"success": True})
-
 # ════════════════════════════════════════════════════════════════════════════
 # STORE PROFILES
 # ════════════════════════════════════════════════════════════════════════════
@@ -2128,22 +1987,4 @@ def check_config():
 boot_active_profile()
 
 if __name__ == '__main__':
-    import webview
-
-    def start_flask():
-        app.run(port=5000, debug=False, use_reloader=False)
-
-    t = threading.Thread(target=start_flask, daemon=True)
-    t.start()
-
-    import time
-    time.sleep(1.5)
-
-    webview.create_window(
-        "Shopify Tools",
-        "http://127.0.0.1:5000",
-        width=1200,
-        height=800,
-        maximized=True
-    )
-    webview.start()
+    app.run(debug=False)

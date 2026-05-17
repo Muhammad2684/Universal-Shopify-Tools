@@ -10,10 +10,9 @@
         const overlay = document.getElementById('settingsOverlay');
         if (!overlay) return;
         overlay.classList.add('open');
-        if (tab) {
-            const navItem = document.querySelector(`.sw-nav-item[onclick*="'${tab}'"]`);
-            switchTab(tab, navItem);
-        }
+        tab = tab || 'license';
+        const navItem = document.querySelector(`.sw-nav-item[onclick*="'${tab}'"]`);
+        switchTab(tab, navItem);
         _fetchSettingsInfo();
         _swFetchProfiles();
     };
@@ -151,10 +150,6 @@
             <div style="display:flex;gap:8px;">
                 <input class="sw-pm-input" id="swedit-ver-${id}" value="${_esc(p.api_version)}" placeholder="API Version" style="flex:1;">
             </div>
-            <div style="display:flex;gap:8px;">
-                <input class="sw-pm-input" id="swedit-ns-${id}"  value="${_esc(p.metafield_namespace)}" placeholder="Namespace" style="flex:1;">
-                <input class="sw-pm-input" id="swedit-key-${id}" value="${_esc(p.metafield_key)}"       placeholder="Key" style="flex:1;">
-            </div>
             <div class="sw-edit-actions">
                 <button class="sw-btn-save-edit"   onclick="swSaveEdit('${id}')">Save</button>
                 <button class="sw-btn-cancel-edit" onclick="swCancelEdit()">Cancel</button>
@@ -171,8 +166,6 @@
             store_url:           document.getElementById(`swedit-url-${id}`).value.trim(),
             access_token:        document.getElementById(`swedit-token-${id}`).value.trim(),
             api_version:         document.getElementById(`swedit-ver-${id}`).value.trim(),
-            metafield_namespace: document.getElementById(`swedit-ns-${id}`).value.trim(),
-            metafield_key:       document.getElementById(`swedit-key-${id}`).value.trim(),
         };
         const res  = await fetch(`/api/profiles/${id}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
@@ -186,18 +179,16 @@
         const url     = document.getElementById('swNewUrl').value.trim();
         const token   = document.getElementById('swNewToken').value.trim();
         const version = document.getElementById('swNewVersion').value.trim() || '2024-07';
-        const ns      = document.getElementById('swNewNs').value.trim();
-        const key     = document.getElementById('swNewKey').value.trim();
 
         if (!name || !url || !token) { _swStatus('Name, URL, and Token are required.', 'err'); return; }
 
         const res  = await fetch('/api/profiles', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, store_url: url, access_token: token, api_version: version, metafield_namespace: ns, metafield_key: key })
+            body: JSON.stringify({ name, store_url: url, access_token: token, api_version: version })
         });
         const data = await res.json();
         if (data.success) {
-            ['swNewName','swNewUrl','swNewToken','swNewVersion','swNewNs','swNewKey'].forEach(id => {
+            ['swNewName','swNewUrl','swNewToken','swNewVersion'].forEach(id => {
                 const el = document.getElementById(id);
                 if (el) el.value = '';
             });
