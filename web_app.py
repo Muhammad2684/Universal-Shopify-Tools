@@ -3,7 +3,7 @@ import json
 import requests
 import datetime
 import csv
-from flask import Flask, render_template, jsonify, request, abort, redirect, url_for, send_file
+from flask import Flask, render_template, render_template_string, jsonify, request, abort, redirect, url_for, send_file
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
@@ -419,7 +419,7 @@ def fetch_order_data(order_identifier):
 @app.before_request
 def check_license():
     allowed = ['/license', '/api/license/validate', '/api/license/clear',
-               '/static', '/auth', '/auth/callback']
+               '/static', '/auth', '/auth/callback', '/connect']
     if any(request.path.startswith(p) for p in allowed):
         return None
 
@@ -474,7 +474,7 @@ def check_license():
                 })
             else:
                 # No store connected yet — send to connect page
-                return redirect(f"/auth?shop=&license_key={lic['key']}")
+                return redirect('/connect')
         except Exception:
             pass
 
@@ -485,6 +485,60 @@ def check_license():
         if path.startswith(route) and flag:
             if permissions.get(flag) == False:
                 return redirect('/403')
+
+@app.route('/connect')
+def connect_store():
+    lic = load_license()
+    license_key = lic['key'] if lic else ''
+    return render_template_string('''
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Connect Your Store — USHT</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0f0f1d; color: #e0e0e0; font-family: -apple-system, sans-serif;
+               display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+        .card { background: #1a1a2e; border: 1px solid #33334d; border-radius: 14px;
+                padding: 2rem; width: 420px; max-width: 95vw; }
+        h1 { color: #e94560; font-size: 1.4em; font-weight: 600; margin-bottom: 0.5rem; }
+        p { color: #b0b0b0; font-size: 0.88em; margin-bottom: 1.5rem; line-height: 1.6; }
+        label { font-size: 0.78em; color: #b0b0b0; text-transform: uppercase;
+                letter-spacing: 0.05em; display: block; margin-bottom: 6px; }
+        input { width: 100%; padding: 11px 12px; background: #2b2b40;
+                border: 1px solid #44446b; border-radius: 8px; color: #e0e0e0;
+                font-size: 0.95em; margin-bottom: 1rem; }
+        input:focus { outline: none; border-color: #e94560; }
+        button { width: 100%; padding: 12px; background: #e94560; color: #fff;
+                 border: none; border-radius: 8px; font-size: 1em; font-weight: 600;
+                 cursor: pointer; }
+        button:hover { filter: brightness(1.1); }
+        .hint { font-size: 0.78em; color: #555; margin-top: 1rem; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Connect Your Store</h1>
+        <p>Enter your Shopify store URL to connect it to Universal Shopify Tools.</p>
+        <label>Store URL</label>
+        <input type="text" id="shopInput" placeholder="your-store.myshopify.com">
+        <button onclick="connect()">Connect Store</button>
+        <p class="hint">You'll be redirected to Shopify to approve access.</p>
+    </div>
+    <script>
+        function connect() {
+            var shop = document.getElementById('shopInput').value.trim();
+            if (!shop) { alert('Please enter your store URL'); return; }
+            if (!shop.endsWith('.myshopify.com')) shop = shop + '.myshopify.com';
+            window.location.href = '/auth?shop=' + shop + '&license_key={{ license_key }}';
+        }
+        document.getElementById('shopInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') connect();
+        });
+    </script>
+</body>
+</html>
+    ''', license_key=license_key)
 
 @app.route('/403')
 def forbidden():
