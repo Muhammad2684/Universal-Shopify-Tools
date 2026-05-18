@@ -104,6 +104,57 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+@app.route('/api/store_token', methods=['POST'])
+def save_store_token():
+    body         = request.get_json(silent=True) or {}
+    license_key  = (body.get('license_key') or '').strip().upper()
+    shop         = (body.get('shop') or '').strip()
+    access_token = (body.get('access_token') or '').strip()
+
+    if not license_key or not shop or not access_token:
+        return jsonify({'success': False, 'error': 'Missing fields'}), 400
+
+    # Verify the license key exists and is valid
+    entry = get_key(license_key)
+    if not entry or entry.get('revoked'):
+        return jsonify({'success': False, 'error': 'Invalid license key'}), 403
+
+    with get_db() as conn:
+        conn.execute('''
+            INSERT INTO store_tokens (license_key, shop, access_token, connected_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(license_key) DO UPDATE SET
+                shop=excluded.shop,
+                access_token=excluded.access_token,
+                connected_at=excluded.connected_at
+        ''', (license_key, shop, access_token, datetime.utcnow().isoformat()))
+        conn.commit()
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/store_token', methods=['GET'])
+def get_store_token():
+    license_key = (request.args.get('license_key') or '').strip().upper()
+
+    if not license_key:
+        return jsonify({'success': False, 'error': 'Missing license_key'}), 400
+
+    with get_db() as conn:
+        row = conn.execute(
+            'SELECT shop, access_token FROM store_tokens WHERE license_key = ?',
+            (license_key,)
+        ).fetchone()
+
+    if not row:
+        return jsonify({'success': False, 'error': 'No store connected'}), 404
+
+    return jsonify({
+        'success':      True,
+        'shop':         row['shop'],
+        'access_token': row['access_token']
+    })
+
 @app.route('/api/validate', methods=['POST'])
 def validate():
     body = request.get_json(silent=True) or {}
