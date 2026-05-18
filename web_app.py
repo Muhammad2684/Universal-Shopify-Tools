@@ -27,6 +27,46 @@ BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
 os.makedirs(BASE_DIR, exist_ok=True)
 
+import sqlite3
+
+TOKEN_DB = os.path.join(BASE_DIR, 'tokens.db')
+
+def init_token_db():
+    os.makedirs(BASE_DIR, exist_ok=True)
+    with sqlite3.connect(TOKEN_DB) as conn:
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS store_tokens (
+                license_key   TEXT PRIMARY KEY,
+                shop          TEXT NOT NULL,
+                access_token  TEXT NOT NULL,
+                connected_at  TEXT
+            )
+        ''')
+        conn.commit()
+
+init_token_db()
+
+def save_store_token(license_key, shop, access_token):
+    with sqlite3.connect(TOKEN_DB) as conn:
+        conn.execute('''
+            INSERT INTO store_tokens (license_key, shop, access_token, connected_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(license_key) DO UPDATE SET
+                shop=excluded.shop,
+                access_token=excluded.access_token,
+                connected_at=excluded.connected_at
+        ''', (license_key, shop, access_token, datetime.datetime.utcnow().isoformat()))
+        conn.commit()
+
+def get_store_token(license_key):
+    with sqlite3.connect(TOKEN_DB) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            'SELECT shop, access_token FROM store_tokens WHERE license_key = ?',
+            (license_key,)
+        ).fetchone()
+    return dict(row) if row else None
+
 active_creds = {
     "SHOPIFY_STORE_URL":    "",
     "SHOPIFY_ACCESS_TOKEN": "",
@@ -214,19 +254,12 @@ def auth_callback():
     if not access_token:
         return "Failed to get access token", 400
 
-    # Save token to license server DB
+    # Save token to local DB
     license_key = session.get('license_key', '')
-    save_resp = requests.post(
-        'https://usht.pythonanywhere.com/api/store_token',
-        json={
-            'license_key':  license_key,
-            'shop':         shop,
-            'access_token': access_token,
-        }
-    )
+    if not license_key:
+        return "No license key in session — please validate your license first", 400
 
-    if not save_resp.json().get('success'):
-        return "Failed to save token — make sure your license key is valid", 400
+    save_store_token(license_key, shop, access_token)
 
     # Store shop in session and redirect to dashboard
     session['shop']         = shop
@@ -480,13 +513,8 @@ def check_license():
     if 'access_token' not in session:
         # Try to load from license server
         try:
-            token_resp = requests.get(
-                'https://usht.pythonanywhere.com/api/store_token',
-                params={'license_key': lic['key']},
-                timeout=5
-            )
-            token_data = token_resp.json()
-            if token_data.get('success'):
+            token_data = get_store_token(lic['key'])
+            if token_data:
                 session['access_token'] = token_data['access_token']
                 session['shop']         = token_data['shop']
                 # Apply to active_creds
