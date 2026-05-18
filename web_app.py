@@ -478,6 +478,16 @@ def check_license():
         except Exception:
             pass
 
+    # Always apply store credentials from session to active_creds
+    if session.get('access_token') and session.get('shop'):
+        _apply_profile({
+            'store_url':           session['shop'],
+            'access_token':        session['access_token'],
+            'api_version':         '2024-07',
+            'metafield_namespace': '',
+            'metafield_key':       '',
+        })
+
     # Enforce permissions
     permissions = lic.get('permissions', {})
     path = request.path
