@@ -146,6 +146,21 @@ SHOPIFY_CLIENT_ID     = os.environ.get('SHOPIFY_CLIENT_ID', '')
 SHOPIFY_CLIENT_SECRET = os.environ.get('SHOPIFY_CLIENT_SECRET', '')
 SHOPIFY_SCOPES        = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments,read_locations'
 
+@app.route('/api/debug_token')
+def debug_token():
+    if not credentials_ok():
+        return jsonify({'error': 'No credentials'})
+    headers = get_headers()
+    # Try to get shop info as a basic test
+    resp = requests.get(
+        f"https://{SHOPIFY_STORE_URL()}/admin/api/2024-07/shop.json",
+        headers=headers
+    )
+    return jsonify({
+        'status': resp.status_code,
+        'response': resp.json()
+    })
+    
 @app.route('/api/debug_scopes')
 def debug_scopes():
     if not credentials_ok():
@@ -156,7 +171,7 @@ def debug_scopes():
         headers=headers
     )
     return jsonify(resp.json())
-    
+
 @app.route('/auth')
 def auth_start():
     shop = request.args.get('shop', '').strip()
