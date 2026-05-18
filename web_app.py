@@ -15,9 +15,11 @@ import hmac, hashlib, base64, secrets
 from flask import session
 from dotenv import load_dotenv  
 load_dotenv()
+from datetime import timedelta
+app.permanent_session_lifetime = timedelta(minutes=10)
 
 app = Flask(__name__)
-app.secret_key = 'replace-with-random-32-char-string'
+app.secret_key = os.environ.get('SECRET_KEY', 'fallback-dev-key')
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
@@ -152,6 +154,7 @@ def auth_start():
         shop = shop + '.myshopify.com'
     state = secrets.token_hex(16)
     session['oauth_state'] = state
+    session.permanent = True
     redirect_uri = 'https://usht-web.onrender.com/auth/callback'
     url = (
         f"https://{shop}/admin/oauth/authorize"
