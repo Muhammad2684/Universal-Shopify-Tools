@@ -23,8 +23,6 @@ app.permanent_session_lifetime = timedelta(minutes=10)
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
-BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
-
 os.makedirs(BASE_DIR, exist_ok=True)
 
 import sqlite3
@@ -185,6 +183,18 @@ def credentials_ok():
 SHOPIFY_CLIENT_ID     = os.environ.get('SHOPIFY_CLIENT_ID', '')
 SHOPIFY_CLIENT_SECRET = os.environ.get('SHOPIFY_CLIENT_SECRET', '')
 SHOPIFY_SCOPES        = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_locations'
+
+@app.route('/api/debug_license')
+def debug_license():
+    try:
+        resp = requests.post(
+            'https://usht.pythonanywhere.com/api/validate',
+            json={'key': 'TEST'},
+            timeout=10
+        )
+        return jsonify({'status': resp.status_code, 'response': resp.json()})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 @app.route('/api/debug_token')
 def debug_token():
@@ -620,7 +630,7 @@ def license_validate():
     if not key:
         return jsonify({'valid': False, 'error': 'No key provided'}), 400
     try:
-        resp = requests.post(f'{LICENSE_SERVER}/api/validate', json={'key': key}, timeout=8)
+        resp = requests.post(f'{LICENSE_SERVER}/api/validate', json={'key': key}, timeout=15)
         data = resp.json()
         if data.get('valid'):
             session['license_key'] = key
