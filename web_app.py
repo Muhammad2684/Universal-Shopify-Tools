@@ -13,13 +13,15 @@ from reportlab.lib.units import inch
 from reportlab.lib.utils import ImageReader
 import hmac, hashlib, base64, secrets
 from flask import session
-from dotenv import load_dotenv  
-load_dotenv()
+from dotenv import load_dotenv
 from datetime import timedelta
-app.permanent_session_lifetime = timedelta(minutes=10)
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'fallback-dev-key')
+app.secret_key = os.environ.get("SECRET_KEY", "fallback-dev-key")
+app.permanent_session_lifetime = timedelta(minutes=10)
+BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
+
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 
