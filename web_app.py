@@ -144,7 +144,7 @@ def credentials_ok():
 
 SHOPIFY_CLIENT_ID     = os.environ.get('SHOPIFY_CLIENT_ID', '')
 SHOPIFY_CLIENT_SECRET = os.environ.get('SHOPIFY_CLIENT_SECRET', '')
-SHOPIFY_SCOPES        = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments,read_locations'
+SHOPIFY_SCOPES        = 'read_orders,write_orders,read_products,write_products,read_inventory,write_inventory,read_fulfillments,write_fulfillments,read_assigned_fulfillment_orders,write_assigned_fulfillment_orders,read_locations'
 
 @app.route('/api/debug_token')
 def debug_token():
@@ -160,7 +160,7 @@ def debug_token():
         'status': resp.status_code,
         'response': resp.json()
     })
-    
+
 @app.route('/api/debug_scopes')
 def debug_scopes():
     if not credentials_ok():
