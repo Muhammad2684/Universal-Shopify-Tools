@@ -156,6 +156,7 @@ def auth_start():
         shop = shop + '.myshopify.com'
     state = secrets.token_hex(16)
     session['oauth_state'] = state
+    session['license_key'] = request.args.get('license_key', session.get('license_key', ''))
     session.permanent = True
     redirect_uri = 'https://usht-web.onrender.com/auth/callback'
     url = (
@@ -177,25 +178,35 @@ def auth_callback():
         return "Invalid state", 403
 
     # Exchange code for access token
-    import requests as req
-    resp = req.post(f"https://{shop}/admin/oauth/access_token", json={
+    resp = requests.post(f"https://{shop}/admin/oauth/access_token", json={
         'client_id':     SHOPIFY_CLIENT_ID,
         'client_secret': SHOPIFY_CLIENT_SECRET,
         'code':          code,
     })
-    token_data = resp.json()
+    token_data   = resp.json()
     access_token = token_data.get('access_token')
 
     if not access_token:
         return "Failed to get access token", 400
 
-    # Save the token — for now just show it so you can test
-    return f"""
-    <h2>Connected!</h2>
-    <p>Shop: {shop}</p>
-    <p>Token: {access_token}</p>
-    <p>Save this token — we'll store it properly in the next step.</p>
-    """
+    # Save token to license server DB
+    license_key = session.get('license_key', '')
+    save_resp = requests.post(
+        'https://usht.pythonanywhere.com/api/store_token',
+        json={
+            'license_key':  license_key,
+            'shop':         shop,
+            'access_token': access_token,
+        }
+    )
+
+    if not save_resp.json().get('success'):
+        return "Failed to save token — make sure your license key is valid", 400
+
+    # Store shop in session and redirect to dashboard
+    session['shop']         = shop
+    session['access_token'] = access_token
+    return redirect('/')
 # ════════════════════════════════════════════════════════════════════════════
 # STORE PROFILES
 # ════════════════════════════════════════════════════════════════════════════
@@ -407,16 +418,20 @@ def fetch_order_data(order_identifier):
 
 @app.before_request
 def check_license():
-    allowed = ['/license', '/api/license/validate', '/api/license/clear', '/static', '/auth', '/auth/callback']
+    allowed = ['/license', '/api/license/validate', '/api/license/clear',
+               '/static', '/auth', '/auth/callback']
     if any(request.path.startswith(p) for p in allowed):
         return None
+
+    # Check license key
     lic = load_license()
     if not lic:
         return redirect('/license')
-    # Re-validate against server on every request
+
+    # Re-validate license
     try:
         resp = requests.post(
-            f'{LICENSE_SERVER}/api/validate',
+            'https://usht.pythonanywhere.com/api/validate',
             json={'key': lic['key']},
             timeout=5
         )
@@ -424,7 +439,6 @@ def check_license():
         if not data.get('valid'):
             clear_license()
             return redirect('/license')
-        # Update local license with latest info (including free_trial flag)
         save_license({
             'key':         lic['key'],
             'plan':        data['plan'],
@@ -435,9 +449,36 @@ def check_license():
             'permissions': data.get('permissions', {}),
         })
     except Exception:
-        pass  # Server unreachable — allow through (offline tolerance)
+        pass
 
-    # ── Enforce Permissions ───────────────────────────────────────────
+    # Check store connection
+    if 'access_token' not in session:
+        # Try to load from license server
+        try:
+            token_resp = requests.get(
+                'https://usht.pythonanywhere.com/api/store_token',
+                params={'license_key': lic['key']},
+                timeout=5
+            )
+            token_data = token_resp.json()
+            if token_data.get('success'):
+                session['access_token'] = token_data['access_token']
+                session['shop']         = token_data['shop']
+                # Apply to active_creds
+                _apply_profile({
+                    'store_url':           token_data['shop'],
+                    'access_token':        token_data['access_token'],
+                    'api_version':         '2024-07',
+                    'metafield_namespace': '',
+                    'metafield_key':       '',
+                })
+            else:
+                # No store connected yet — send to connect page
+                return redirect(f"/auth?shop=&license_key={lic['key']}")
+        except Exception:
+            pass
+
+    # Enforce permissions
     permissions = lic.get('permissions', {})
     path = request.path
     for route, flag in ROUTE_PERMISSIONS.items():
@@ -465,6 +506,7 @@ def license_validate():
         resp = requests.post(f'{LICENSE_SERVER}/api/validate', json={'key': key}, timeout=8)
         data = resp.json()
         if data.get('valid'):
+            session['license_key'] = key
             save_license({
                 'key':         key,
                 'plan':        data['plan'],
