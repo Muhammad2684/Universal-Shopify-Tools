@@ -149,7 +149,7 @@ def credentials_ok():
 # Shopify Auth
 # ════════════════════════════════════════════════════════════════════════════
 
-app.secret_key = '7xK9pM2wQfB4vR8zYtN1sX6jC5dK3mLa'
+app.secret_key = 'USHT#SECRET#2024'
 
 SHOPIFY_CLIENT_ID     = os.environ.get('SHOPIFY_CLIENT_ID', '')
 SHOPIFY_CLIENT_SECRET = os.environ.get('SHOPIFY_CLIENT_SECRET', '')
