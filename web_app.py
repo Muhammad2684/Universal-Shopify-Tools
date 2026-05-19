@@ -225,21 +225,22 @@ def debug_scopes():
 @app.route('/auth')
 def auth_start():
     shop = request.args.get('shop', '').strip()
-    if not shop:
-        return "Missing shop parameter", 400
+    license_key = request.args.get('license_key', '').strip()
+    
     if not shop.endswith('.myshopify.com'):
         shop = shop + '.myshopify.com'
+    
     state = secrets.token_hex(16)
     session['oauth_state'] = state
-    session['license_key'] = request.args.get('license_key', session.get('license_key', ''))
     session.permanent = True
+    
     redirect_uri = 'https://usht-web.onrender.com/auth/callback'
     url = (
         f"https://{shop}/admin/oauth/authorize"
         f"?client_id={SHOPIFY_CLIENT_ID}"
         f"&scope={SHOPIFY_SCOPES}"
         f"&redirect_uri={redirect_uri}"
-        f"&state={state}"
+        f"&state={state}|{license_key}"
     )
     return redirect(url)
 
@@ -249,31 +250,32 @@ def auth_callback():
     code  = request.args.get('code', '')
     state = request.args.get('state', '')
 
-    if state != session.get('oauth_state'):
+    # Split state back out
+    if '|' in state:
+        oauth_state, license_key = state.split('|', 1)
+    else:
+        oauth_state, license_key = state, ''
+
+    if oauth_state != session.get('oauth_state'):
         return "Invalid state", 403
 
-    # Exchange code for access token
+    # Exchange code for token
     resp = requests.post(f"https://{shop}/admin/oauth/access_token", json={
         'client_id':     SHOPIFY_CLIENT_ID,
         'client_secret': SHOPIFY_CLIENT_SECRET,
         'code':          code,
     })
-    token_data   = resp.json()
-    access_token = token_data.get('access_token')
-
+    access_token = resp.json().get('access_token')
     if not access_token:
         return "Failed to get access token", 400
 
-    # Save token to local DB
-    license_key = session.get('license_key', '')
     if not license_key:
-        return "No license key in session — please validate your license first", 400
+        return "No license key — please validate your license first", 400
 
     save_store_token(license_key, shop, access_token)
-
-    # Store shop in session and redirect to dashboard
-    session['shop']         = shop
+    session['shop'] = shop
     session['access_token'] = access_token
+    session.permanent = True
     return redirect('/')
 # ════════════════════════════════════════════════════════════════════════════
 # STORE PROFILES
