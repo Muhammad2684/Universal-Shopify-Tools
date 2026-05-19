@@ -19,7 +19,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "fallback-dev-key")
-app.permanent_session_lifetime = timedelta(minutes=10)
+app.permanent_session_lifetime = timedelta(hours=24)
 BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
@@ -483,6 +483,10 @@ def fetch_order_data(order_identifier):
 # ════════════════════════════════════════════════════════════════════════════
 # DASHBOARD
 # ════════════════════════════════════════════════════════════════════════════
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
 
 @app.before_request
 def check_license():
