@@ -45,6 +45,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     opacity: 0; transition: opacity 0.3s; margin-left: 6px;
 }
 .saving-dot.show { opacity: 1; }
+.btn-refresh {
+    background: none; border: none; color: var(--muted);
+    cursor: pointer; padding: 4px; margin-right: 4px;
+    vertical-align: -3px; transition: color 0.2s, transform 0.3s;
+}
+.btn-refresh svg { width: 16px; height: 16px; }
+.btn-refresh:active { color: var(--accent); transform: rotate(160deg); }
 .header-total { font-size: 0.9rem; color: var(--muted); }
 .header-total span { color: var(--green); font-weight: 700; }
 
@@ -278,7 +285,12 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
     <!-- Header -->
     <div class="header">
-        <h1>My Accountant <span class="saving-dot" id="savingDot"></span></h1>
+        <h1>
+            <button class="btn-refresh" onclick="refreshData()" aria-label="Refresh" title="Refresh">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+            </button>
+            My Accountant <span class="saving-dot" id="savingDot"></span>
+        </h1>
         <div class="header-total">Rs. <span id="headerTotal">0</span></div>
     </div>
 
@@ -436,6 +448,28 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             </div>
 
             <div class="settings-section">
+                <div class="section-title">Import</div>
+                <div class="settings-card">
+                    <div class="settings-row" onclick="document.getElementById('importCSVInput').click()">
+                        <div>
+                            <div class="row-label">Import from CSV</div>
+                            <div class="row-sub">Merge entries from a spreadsheet file</div>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                    <div class="settings-row" onclick="document.getElementById('importJSONInput').click()">
+                        <div>
+                            <div class="row-label">Import from JSON</div>
+                            <div class="row-sub">Restore from a JSON backup</div>
+                        </div>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    </div>
+                </div>
+                <input type="file" id="importCSVInput" accept=".csv,text/csv" style="display:none;" onchange="onImportFile(this, 'csv')">
+                <input type="file" id="importJSONInput" accept=".json,application/json" style="display:none;" onchange="onImportFile(this, 'json')">
+            </div>
+
+            <div class="settings-section">
                 <div class="section-title">Danger Zone</div>
                 <button class="btn-danger-full" onclick="openDeleteModal()">Delete All Entries</button>
             </div>
@@ -566,29 +600,53 @@ async function persist() {
     saveDotTimer = setTimeout(() => document.getElementById('savingDot').classList.remove('show'), 800);
 }
 
+async function fetchData() {
+    if (API_MODE === 'supabase') {
+        const latest = await fetchLatestPayload();
+        return {
+            entries:  (latest && latest.entries) || [],
+            settings: (latest && latest.settings) || null,
+        };
+    }
+    const res  = await fetch('/api/accountant/load');
+    const data = await res.json();
+    return { entries: data.entries || [], settings: data.settings || null };
+}
+
 async function hydrate() {
     try {
-        let settings = null;
-        if (API_MODE === 'supabase') {
-            const latest = await fetchLatestPayload();
-            if (latest) {
-                entries  = latest.entries || [];
-                settings = latest.settings || null;
-            }
-        } else {
-            const res  = await fetch('/api/accountant/load');
-            const data = await res.json();
-            entries  = data.entries || [];
-            settings = data.settings || null;
-        }
-        if (settings) {
-            currentSettings = settings;
-            if (settings.rates) Object.assign(RATES, settings.rates);
+        const data = await fetchData();
+        entries = data.entries;
+        if (data.settings) {
+            currentSettings = data.settings;
+            if (data.settings.rates) Object.assign(RATES, data.settings.rates);
         }
     } catch(e) { console.warn('Load failed'); }
     applyRatesUI();
     setTodayDate();
     renderAll();
+}
+
+async function refreshData() {
+    showToast('Refreshing…');
+    try {
+        const data = await fetchData();
+        entries = data.entries;
+        if (data.settings) {
+            currentSettings = data.settings;
+            if (data.settings.rates) Object.assign(RATES, data.settings.rates);
+        }
+        undoStack = [];
+        cancelEdit();
+        applyRatesUI();
+        populateRateInputs();
+        renderAll();
+        renderEntries();
+        showToast('Refreshed');
+    } catch(e) {
+        console.warn('Refresh failed:', e);
+        showToast('Refresh failed');
+    }
 }
 
 // ── Navigation ────────────────────────────────────────────────────────────────
@@ -914,10 +972,15 @@ function confirmDeleteAll() {
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
+function csvField(v) {
+    const s = String(v == null ? '' : v);
+    return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
 function buildCSV() {
     const rows = [['Date','Day','Type','Qty','Earnings']];
     entries.forEach(e => rows.push([e.display, e.dayName, TYPE_LABELS[e.type], e.qty, e.earnings]));
-    return rows.map(r => r.join(',')).join('\n');
+    return rows.map(r => r.map(csvField).join(',')).join('\n');
 }
 
 async function exportCSV() {
@@ -960,6 +1023,145 @@ function downloadFile(name, type, content) {
     a.href = URL.createObjectURL(new Blob([content], { type }));
     a.download = name;
     a.click();
+}
+
+// ── Import ────────────────────────────────────────────────────────────────────
+function normalizeType(t) {
+    t = (t || '').trim().toLowerCase();
+    if (['packed','returned','po','custom'].indexOf(t) !== -1) return t;
+    const map = { 'packing': 'packed', 'returns': 'returned', 'purchase order': 'po',
+                  'custom prints': 'custom', 'custom': 'custom' };
+    return map[t] || null;
+}
+
+function parseDateString(str) {
+    str = (str || '').trim();
+    if (!str) return null;
+    const iso = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (iso) {
+        const y = +iso[1], mo = +iso[2], d = +iso[3];
+        const date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const info = getDateInfo(date);
+        return { date, display: info.displayDate, dayName: info.dayName, isWeekend: info.isWeekend };
+    }
+    const m = str.match(/(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\s+(\d{4})/);
+    if (m) {
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const mm = m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase();
+        const mon = months.indexOf(mm);
+        if (mon !== -1) {
+            const y = +m[3], d = +m[1], mo = mon + 1;
+            const date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+            const info = getDateInfo(date);
+            return { date, display: info.displayDate, dayName: info.dayName, isWeekend: info.isWeekend };
+        }
+    }
+    return null;
+}
+
+function splitCSVLine(line) {
+    const out = [];
+    let cur = '', inQ = false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (inQ) {
+            if (c === '"') {
+                if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false;
+            } else cur += c;
+        } else if (c === '"') {
+            inQ = true;
+        } else if (c === ',') {
+            out.push(cur); cur = '';
+        } else {
+            cur += c;
+        }
+    }
+    out.push(cur);
+    return out.map(s => s.trim());
+}
+
+function parseCSV(text) {
+    const lines = text.replace(/\r\n?/g, '\n').split('\n').filter(l => l.trim());
+    if (lines.length < 2) return [];
+    const head = splitCSVLine(lines[0]).map(h => h.toLowerCase());
+    const idx = name => head.indexOf(name.toLowerCase());
+    if (idx('date') === -1 || idx('type') === -1) throw new Error('Missing Date/Type headers');
+    const N = head.length;
+    const out = [];
+    for (let i = 1; i < lines.length; i++) {
+        let parts = splitCSVLine(lines[i]);
+        if (parts.length > N) parts = [parts.slice(0, parts.length - N + 1).join(','), ...parts.slice(parts.length - N + 1)];
+        if (parts.length < N) parts = parts.concat(Array(N - parts.length).fill(''));
+        const dstr  = (parts[idx('date')] || '').trim();
+        const type  = normalizeType(parts[idx('type')]);
+        const qty   = parseInt(parts[idx('qty')], 10);
+        const di    = parseDateString(dstr);
+        if (!type || !di || isNaN(qty) || qty < 1) continue;
+        const entry = { date: di.date, display: di.display, dayName: di.dayName, isWeekend: di.isWeekend, type, qty, earnings: 0 };
+        const earnRaw = parseFloat(parts[idx('earnings')]);
+        entry.earnings = (!isNaN(earnRaw) && earnRaw > 0) ? earnRaw : calcEarnings(type, qty, di.date);
+        out.push(entry);
+    }
+    if (!out.length) throw new Error('No valid rows found');
+    return out;
+}
+
+function parseJSONImport(text) {
+    const data = JSON.parse(text);
+    let list = data, settings = null;
+    if (data && !Array.isArray(data) && typeof data === 'object') {
+        list     = data.entries || [];
+        settings = data.settings || null;
+    }
+    if (!Array.isArray(list)) throw new Error('Unsupported JSON shape');
+    const out = [];
+    list.forEach(raw => {
+        if (!raw || typeof raw !== 'object') return;
+        const type = normalizeType(raw.type);
+        const qty  = parseInt(raw.qty, 10);
+        const di   = parseDateString(String(raw.date));
+        if (!type || !di || isNaN(qty) || qty < 1) return;
+        const entry = { date: di.date, display: di.display, dayName: di.dayName, isWeekend: di.isWeekend, type, qty, earnings: 0 };
+        const e = Number(raw.earnings);
+        entry.earnings = (!isNaN(e) && e > 0) ? e : calcEarnings(type, qty, di.date);
+        out.push(entry);
+    });
+    if (!out.length) throw new Error('No valid entries found');
+    return { imported: out, settings };
+}
+
+function onImportFile(input, kind) {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    showToast('Importing…');
+    file.text().then(text => {
+        let imported = [], settings = null;
+        try {
+            if (kind === 'csv') {
+                imported = parseCSV(text);
+            } else {
+                const r = parseJSONImport(text);
+                imported = r.imported; settings = r.settings;
+            }
+        } catch(e) {
+            console.warn('Import parse failed:', e);
+            showToast('Import failed: ' + e.message);
+            return;
+        }
+        if (!imported.length) { showToast('No valid entries found'); return; }
+        undoStack.push(JSON.parse(JSON.stringify(entries)));
+        entries = entries.concat(imported);
+        if (settings && settings.rates && typeof settings.rates === 'object') {
+            currentSettings = Object.assign({}, currentSettings || {}, { rates: settings.rates });
+            Object.assign(RATES, settings.rates);
+            applyRatesUI();
+        }
+        persist();
+        renderAll();
+        renderEntries();
+        showToast(`Imported ${imported.length} entries`);
+    }).catch(() => showToast('Could not read file'));
 }
 
 // ── Init ──────────────────────────────────────────────────────────────────────
