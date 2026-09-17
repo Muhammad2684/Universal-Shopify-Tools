@@ -39,6 +39,7 @@
         if (title && el) title.textContent = 'Settings — ' + el.textContent.trim();
 
         if (tabId === 'profiles') _swFetchProfiles();
+        if (tabId === 'accountant') _swFetchAccountantSettings();
     };
 
     // ── Fetch version + license info ─────────────────────────────────────────
@@ -219,5 +220,53 @@
     window.openLicenseAdmin = function () {
         window.open('https://usht.pythonanywhere.com/admin', '_blank');
     };
+
+    // ── Accountant settings (rates) ──────────────────────────────────────────
+    async function _swFetchAccountantSettings() {
+        try {
+            const res  = await fetch('/api/accountant/settings');
+            const data = await res.json();
+            if (!data.success) return;
+            const r = data.rates || {};
+            _setValue('swRatePackedWeekday', r.packed_weekday);
+            _setValue('swRatePackedWeekend', r.packed_weekend);
+            _setValue('swRateReturned',      r.returned);
+            _setValue('swRatePo',            r.po);
+            _setValue('swRateCustom',        r.custom);
+        } catch (e) {}
+    }
+
+    function _setValue(id, val) {
+        const el = document.getElementById(id);
+        if (el) el.value = (val === undefined || val === null || val === '') ? '' : val;
+    }
+
+    window.swSaveAccountantSettings = async function () {
+        const rates = {
+            packed_weekday: parseFloat(document.getElementById('swRatePackedWeekday').value),
+            packed_weekend: parseFloat(document.getElementById('swRatePackedWeekend').value),
+            returned:       parseFloat(document.getElementById('swRateReturned').value),
+            po:             parseFloat(document.getElementById('swRatePo').value),
+            custom:         parseFloat(document.getElementById('swRateCustom').value),
+        };
+        try {
+            const res  = await fetch('/api/accountant/settings', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rates })
+            });
+            const data = await res.json();
+            _swAccStatus(data.success ? 'Rates saved!' : 'Failed to save rates.', data.success ? 'ok' : 'err');
+            if (data.success && data.rates) window.dispatchEvent(new CustomEvent('accountant-settings-changed', { detail: data.rates }));
+        } catch (e) {
+            _swAccStatus('Failed to save rates.', 'err');
+        }
+    };
+
+    function _swAccStatus(msg, type) {
+        const el = document.getElementById('swAccStatus');
+        if (!el) return;
+        el.textContent = msg;
+        el.className   = 'sw-add-status ' + type;
+        setTimeout(() => { el.textContent = ''; el.className = 'sw-add-status'; }, 3000);
+    }
 
 })();

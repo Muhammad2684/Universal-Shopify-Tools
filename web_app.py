@@ -2090,14 +2090,28 @@ def search_products():
 
 ACCOUNTANT_FILE = os.path.join(BASE_DIR, 'accountant_data.json')
 
+ACCOUNTANT_DEFAULT_RATES = {
+    'packed_weekday': 13,
+    'packed_weekend': 15,
+    'returned':       15,
+    'po':              5,
+    'custom':        100,
+}
+
 def load_accountant_data():
     if os.path.exists(ACCOUNTANT_FILE):
         try:
             with open(ACCOUNTANT_FILE, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                if not isinstance(data, dict):
+                    data = {}
         except Exception:
-            pass
-    return {'entries': []}
+            data = {}
+    else:
+        data = {}
+    data.setdefault('settings', {})
+    data['settings'].setdefault('rates', dict(ACCOUNTANT_DEFAULT_RATES))
+    return data
 
 def save_accountant_data(data):
     with open(ACCOUNTANT_FILE, 'w') as f:
@@ -2114,9 +2128,36 @@ def accountant_load():
 @app.route('/api/accountant/save', methods=['POST'])
 def accountant_save():
     try:
-        data = request.get_json()
-        save_accountant_data({'entries': data.get('entries', [])})
+        data     = request.get_json()
+        existing = load_accountant_data()
+        existing['entries'] = data.get('entries', [])
+        save_accountant_data(existing)
         return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/accountant/settings', methods=['GET'])
+def accountant_settings_get():
+    data  = load_accountant_data()
+    rates = data.get('settings', {}).get('rates', dict(ACCOUNTANT_DEFAULT_RATES))
+    return jsonify({'success': True, 'rates': rates})
+
+@app.route('/api/accountant/settings', methods=['POST'])
+def accountant_settings_save():
+    try:
+        data  = request.get_json() or {}
+        rates = data.get('rates') or {}
+        clean = {
+            'packed_weekday': int(rates.get('packed_weekday', ACCOUNTANT_DEFAULT_RATES['packed_weekday'])),
+            'packed_weekend': int(rates.get('packed_weekend', ACCOUNTANT_DEFAULT_RATES['packed_weekend'])),
+            'returned':       int(rates.get('returned',       ACCOUNTANT_DEFAULT_RATES['returned'])),
+            'po':             int(rates.get('po',             ACCOUNTANT_DEFAULT_RATES['po'])),
+            'custom':         int(rates.get('custom',         ACCOUNTANT_DEFAULT_RATES['custom'])),
+        }
+        acc = load_accountant_data()
+        acc.setdefault('settings', {})['rates'] = clean
+        save_accountant_data(acc)
+        return jsonify({'success': True, 'rates': clean})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

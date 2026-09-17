@@ -411,15 +411,15 @@ ul { list-style: none; padding: 0; margin: 0; }
                         </button>
                         <button class="type-tab" id="tab-returned" onclick="selectType('returned')">
                             Returns Done
-                            <span class="tab-rate">Rs.15 flat</span>
+                            <span class="tab-rate" id="rate-returned">Rs.15 flat</span>
                         </button>
                         <button class="type-tab" id="tab-po" onclick="selectType('po')">
                             Purchase Order
-                            <span class="tab-rate">Rs.5 / unit</span>
+                            <span class="tab-rate" id="rate-po">Rs.5 / unit</span>
                         </button>
                         <button class="type-tab" id="tab-custom" onclick="selectType('custom')">
                             Custom Prints
-                            <span class="tab-rate">Rs.100 / order</span>
+                            <span class="tab-rate" id="rate-custom">Rs.100 / order</span>
                         </button>
                     </div>
                 </div>
@@ -564,15 +564,27 @@ ul { list-style: none; padding: 0; margin: 0; }
 <!-- Shared Scripts -->
 <script src="{{ url_for('static', filename='js/Rmenu.js') }}"></script>
 
+<!-- Delete Modal -->
+<div class="modal-overlay" id="deleteModal" onclick="handleModalClick(event)">
+    <div class="modal-box">
+        <h2>Delete All Entries?</h2>
+        <p>This will remove all entries. You can undo immediately after.</p>
+        <div class="modal-btns">
+            <button class="btn-modal-cancel" onclick="closeDeleteModal()">Cancel</button>
+            <button class="btn-modal-delete" onclick="confirmDeleteAll()">Delete All</button>
+        </div>
+    </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-const RATES = {
-    packed_weekday:  13,
-    packed_weekend:  15,
-    returned:        15,
-    po:               5,
-    custom:         100,
+let RATES = {
+    packed_weekday: 13,
+    packed_weekend: 15,
+    returned:       15,
+    po:              5,
+    custom:        100,
 };
 const TYPE_LABELS = { packed: 'Packing', returned: 'Returns', po: 'PO', custom: 'Custom' };
 const DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -607,9 +619,29 @@ async function hydrate() {
         const res  = await fetch('/api/accountant/load');
         const data = await res.json();
         entries = data.entries || [];
+        if (data.settings && data.settings.rates) Object.assign(RATES, data.settings.rates);
     } catch(e) { console.warn('Load failed, starting fresh.'); }
+    applyRatesUI();
     setTodayDate();
     render();
+}
+
+window.addEventListener('accountant-settings-changed', () => {
+    fetch('/api/accountant/settings').then(r => r.json()).then(d => {
+        if (d.success && d.rates) { Object.assign(RATES, d.rates); applyRatesUI(); render(); }
+    }).catch(() => {});
+});
+
+function applyRatesUI() {
+    const packed  = document.getElementById('rate-packed');
+    const ret     = document.getElementById('rate-returned');
+    const po      = document.getElementById('rate-po');
+    const custom  = document.getElementById('rate-custom');
+    if (packed) packed.textContent  = `Rs.${RATES.packed_weekday} / Rs.${RATES.packed_weekend}`;
+    if (ret)    ret.textContent     = `Rs.${RATES.returned} flat`;
+    if (po)     po.textContent      = `Rs.${RATES.po} / unit`;
+    if (custom) custom.textContent  = `Rs.${RATES.custom} / order`;
+    if (activeType) updatePreview();
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -805,6 +837,7 @@ document.addEventListener('keydown', e => {
 // ── Delete All ────────────────────────────────────────────────────────────────
 function openDeleteModal()  { document.getElementById('deleteModal').classList.add('open'); }
 function closeDeleteModal() { document.getElementById('deleteModal').classList.remove('open'); }
+function handleModalClick(e) { if (e.target === e.currentTarget) closeDeleteModal(); }
 function confirmDeleteAll() {
     undoStack.push(JSON.parse(JSON.stringify(entries)));
     redoStack = [];
