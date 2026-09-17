@@ -1,5 +1,5 @@
 {
-  "version": "1.3.2",
-  "notes": "Add: editable packing rates for My Accountant via Settings; fix: delete-all modal closes on backdrop click",
-  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.2/USHT.exe"
+  "version": "1.3.3",
+  "notes": "Add: mobile accountant import CSV/JSON + refresh button; Supabase sync for My Accountant (rates/config in Settings); build APK workflow",
+  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.3/USHT.exe"
 }
