@@ -51,11 +51,51 @@ All runtime data lives in `BASE_DIR` = `%APPDATA%\UniversalSHTools` (Windows) or
 | `profiles.json` | Store profiles + which one is active |
 | `license.json` | Cached license/permissions |
 | `categories.json` | Stock app category tree (parents/subcats) |
-| `accountant_data.json` | Accountant earnings/expense entries |
-| `.env` | Local dev secrets (gitignored) |
+| `accountant_data.json` | Accountant earnings/expense entries + settings (local cache; Supabase-backed when configured) |
+| `supabase.json` | Optional Supabase URL + anon key for the packaged desktop app (gitignored) |
+| `.env` | Local dev secrets (gitignored; supports `SUPABASE_URL` / `SUPABASE_ANON_KEY`) |
 | `version.json` | Version + release notes + download URL for auto-update (pulled from GitHub raw; update check hits this repo's `version.json`) |
 
 `accountant_data.json` also appears at repo root (runtime copy); the canonical path is `BASE_DIR`.
+
+## Mobile app (Capacitor APK + Supabase)
+
+The mobile accountant app (`templates/accountant_mobile.html`) is a mobile-first surface that runs in two modes:
+
+- **Web/PWA mode** — served locally by Flask at `/mobile/accountant`; uses the normal `/api/accountant/*` endpoints (which sync Supabase via the desktop layer).
+- **APK mode** — bundled into an Android app via **Capacitor** (`mobile/`); talks to **Supabase PostgREST** directly using the anon key inlined at the top of the template. Undo/redo/rates/export all work on-device.
+
+### Supabase setup (one-time)
+1. Create a project at supabase.com; copy **Project URL** + **anon key**.
+2. Run this SQL (single JSON-document store, open RLS — no login):
+   ```sql
+   create table accountant_data (
+     id         bigint primary key default 1,
+     payload    jsonb not null,
+     updated_at timestamptz default now()
+   );
+   alter table accountant_data enable row level security;
+   create policy "open all" on accountant_data for all using (true) with check (true);
+   ```
+3. Desktop: put `SUPABASE_URL` / `SUPABASE_ANON_KEY` in `.env`, or create `%APPDATA%\UniversalSHTools\supabase.json` = `{"url": "...", "anon_key": "..."}`. Without config, behaviour stays local-file-only.
+4. APK: fill `SUPABASE_URL` / `SUPABASE_ANON_KEY` at the top of `templates/accountant_mobile.html` **before** building.
+
+Desktop reads Supabase first and caches to `accountant_data.json`; saves write local-first then push to Supabase (last-write-wins across devices).
+
+### Building the APK (no local Android SDK needed)
+- Push to GitHub (already `origin` = `Muhammad2684/Universal-Shopify-Tools`), then run the **Build Android APK** workflow (manual dispatch or tag `apk-*`) → `.github/workflows/build-apk.yml`.
+- Artifact `nafees-accountant-debug` contains `app-debug.apk` (installable).
+- Optional: set `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` secrets for a build-status ping.
+
+### Mobile commands
+```powershell
+cd mobile
+npm install                      # first time
+npm run sync:www                 # template -> www/ + capacitor vendor bundles
+npx cap sync android             # copy + sync native plugins
+```
+`mobile/www/` and `mobile/android/app/src/main/assets/public` are generated and gitignored; the CI workflow rebuilds them from `templates/accountant_mobile.html`.
+Icons: `tools/gen_icons.py` regenerates `static/icons/icon-192|512.png` and the Android launcher icons.
 
 ## Build / packaging (PyInstaller)
 
@@ -69,7 +109,7 @@ All runtime data lives in `BASE_DIR` = `%APPDATA%\UniversalSHTools` (Windows) or
 - Use pinned versions in `requirements.txt` (no `>=`).
 - Keep feature ideas in `Improvements.md` (checkboxes tracked there). `Plan.html` holds planning/scope notes.
 - Time/datetime handling uses the app's configured timezone (pytz/tzlocal present in requirements).
-- Do not commit `.env`, `venv/`, `dist/`, `build/`, `*.spec`, `__pycache__/`, or root `profiles.json` (see `.gitignore`).
+- Do not commit `.env`, `venv/`, `dist/`, `build/`, `*.spec`, `__pycache__/`, root `profiles.json`, `supabase.json`, or `mobile/www/` / `mobile/node_modules/` (see `.gitignore`).
 
 ## Commands
 

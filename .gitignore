@@ -11,3 +11,10 @@ test.py
 profiles.json
 *.db
 keys.db
+
+# Supabase config (API keys — never commit)
+supabase.json
+
+# Mobile (Capacitor) — generated/build artifacts
+mobile/node_modules/
+mobile/www/

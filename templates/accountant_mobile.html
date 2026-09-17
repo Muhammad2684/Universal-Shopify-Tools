@@ -320,19 +320,19 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
             <div class="type-grid">
                 <button class="type-btn active" id="tab-packed" onclick="selectType('packed')">
                     Orders Packed
-                    <span class="rate">Rs.13 / Rs.15</span>
+                    <span class="rate" id="rate-packed">Rs.13 / Rs.15</span>
                 </button>
                 <button class="type-btn" id="tab-returned" onclick="selectType('returned')">
                     Returns Done
-                    <span class="rate">Rs.15 flat</span>
+                    <span class="rate" id="rate-returned">Rs.15 flat</span>
                 </button>
                 <button class="type-btn" id="tab-po" onclick="selectType('po')">
                     Purchase Order
-                    <span class="rate">Rs.5 / unit</span>
+                    <span class="rate" id="rate-po">Rs.5 / unit</span>
                 </button>
                 <button class="type-btn" id="tab-custom" onclick="selectType('custom')">
                     Custom Prints
-                    <span class="rate">Rs.100 / order</span>
+                    <span class="rate" id="rate-custom">Rs.100 / order</span>
                 </button>
             </div>
 
@@ -383,6 +383,38 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
         <!-- ── SETTINGS PAGE ── -->
         <div class="page" id="page-settings">
+            <div class="settings-section">
+                <div class="section-title">Rates</div>
+                <div class="settings-card">
+                    <div class="settings-row" style="cursor:default;">
+                        <div class="row-label">Orders Packed — Weekday</div>
+                        <input class="form-input" id="mRateWeekday" type="number" min="0" step="0.01"
+                            style="width:90px; text-align:right; padding:8px 10px;">
+                    </div>
+                    <div class="settings-row" style="cursor:default;">
+                        <div class="row-label">Orders Packed — Weekend</div>
+                        <input class="form-input" id="mRateWeekend" type="number" min="0" step="0.01"
+                            style="width:90px; text-align:right; padding:8px 10px;">
+                    </div>
+                    <div class="settings-row" style="cursor:default;">
+                        <div class="row-label">Returns Done</div>
+                        <input class="form-input" id="mRateReturned" type="number" min="0" step="0.01"
+                            style="width:90px; text-align:right; padding:8px 10px;">
+                    </div>
+                    <div class="settings-row" style="cursor:default;">
+                        <div class="row-label">Purchase Order per unit</div>
+                        <input class="form-input" id="mRatePo" type="number" min="0" step="0.01"
+                            style="width:90px; text-align:right; padding:8px 10px;">
+                    </div>
+                    <div class="settings-row" style="cursor:default;">
+                        <div class="row-label">Custom Prints per order</div>
+                        <input class="form-input" id="mRateCustom" type="number" min="0" step="0.01"
+                            style="width:90px; text-align:right; padding:8px 10px;">
+                    </div>
+                </div>
+                <button class="btn-submit" onclick="saveRates()" style="margin-top:10px;">Save Rates</button>
+            </div>
+
             <div class="settings-section">
                 <div class="section-title">Export</div>
                 <div class="settings-card">
@@ -446,41 +478,115 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 <div class="toast" id="toast"></div>
 
+<script type="importmap">
+{
+    "imports": {
+        "@capacitor/core": "./vendor/core/index.js",
+        "@capacitor/synapse": "./vendor/synapse/synapse.mjs",
+        "@capacitor/filesystem": "./vendor/filesystem/esm/index.js",
+        "@capacitor/share": "./vendor/share/esm/index.js"
+    }
+}
+</script>
+
 <script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const IS_CAPACITOR = typeof window.Capacitor !== 'undefined' &&
+    !!(window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+const API_MODE = IS_CAPACITOR ? 'supabase' : 'flask';
+
+// Fill these in with your own Supabase project before building the APK
+const SUPABASE_URL      = 'https://aukawlahcsephxxssyep.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1a2F3bGFoY3NlcGh4eHNzeWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk2NTkyMzMsImV4cCI6MjEwNTIzNTIzM30.cq6Za8punxPzx3VJXHpYUz8tHkwLdyIYupfOxD1JMQE';
+const SUPABASE_TABLE    = 'accountant_data';
+const SUPABASE_HEADERS  = {
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────────
-const RATES = { packed_weekday: 13, packed_weekend: 15, returned: 15, po: 5, custom: 100 };
+const DEFAULT_RATES = { packed_weekday: 13, packed_weekend: 15, returned: 15, po: 5, custom: 100 };
+let RATES = Object.assign({}, DEFAULT_RATES);
 const TYPE_LABELS = { packed: 'Packing', returned: 'Returns', po: 'PO', custom: 'Custom' };
 const DAY_FULL  = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const QTY_LABELS = { packed: 'Orders packed', returned: 'Returns processed', po: 'Units in PO', custom: 'Custom orders printed' };
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let entries    = [];
-let undoStack  = [];
-let editingIdx = null;
-let activeType = 'packed';
-let toastTimer = null;
-let saveDotTimer = null;
+let entries         = [];
+let undoStack       = [];
+let editingIdx      = null;
+let activeType      = 'packed';
+let toastTimer      = null;
+let saveDotTimer    = null;
+let currentSettings = null;
+
+// ── Supabase helpers (APK mode only) ──────────────────────────────────────────
+async function fetchLatestPayload() {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?select=payload&id=eq.1`, {
+        headers: SUPABASE_HEADERS,
+    });
+    const rows = await res.json();
+    return (Array.isArray(rows) && rows.length && rows[0].payload) || {};
+}
+
+async function pushPayload(payload) {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLE}?on_conflict=id`, {
+        method: 'POST',
+        headers: Object.assign({}, SUPABASE_HEADERS, { 'Prefer': 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify({
+            id: 1,
+            payload,
+            updated_at: new Date().toISOString(),
+        }),
+    });
+    if (!res.ok) throw new Error('Supabase upsert failed: ' + res.status);
+}
 
 // ── Persistence ───────────────────────────────────────────────────────────────
 async function persist() {
     document.getElementById('savingDot').classList.add('show');
     clearTimeout(saveDotTimer);
     try {
-        await fetch('/api/accountant/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ entries })
-        });
+        if (API_MODE === 'supabase') {
+            const latest = await fetchLatestPayload().catch(() => ({}));
+            const payload = latest || {};
+            payload.entries = entries;
+            if (currentSettings) payload.settings = currentSettings;
+            await pushPayload(payload);
+        } else {
+            await fetch('/api/accountant/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ entries })
+            });
+        }
     } catch(e) { console.warn('Save failed:', e); }
     saveDotTimer = setTimeout(() => document.getElementById('savingDot').classList.remove('show'), 800);
 }
 
 async function hydrate() {
     try {
-        const res = await fetch('/api/accountant/load');
-        const data = await res.json();
-        entries = data.entries || [];
+        let settings = null;
+        if (API_MODE === 'supabase') {
+            const latest = await fetchLatestPayload();
+            if (latest) {
+                entries  = latest.entries || [];
+                settings = latest.settings || null;
+            }
+        } else {
+            const res  = await fetch('/api/accountant/load');
+            const data = await res.json();
+            entries  = data.entries || [];
+            settings = data.settings || null;
+        }
+        if (settings) {
+            currentSettings = settings;
+            if (settings.rates) Object.assign(RATES, settings.rates);
+        }
     } catch(e) { console.warn('Load failed'); }
+    applyRatesUI();
     setTodayDate();
     renderAll();
 }
@@ -492,6 +598,7 @@ function switchTab(name) {
     document.getElementById(`page-${name}`).classList.add('active');
     document.getElementById(`nav-${name}`).classList.add('active');
     if (name === 'entries') renderEntries();
+    if (name === 'settings') populateRateInputs();
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
@@ -658,6 +765,68 @@ function undoAction() {
     showToast('Undo successful');
 }
 
+// ── Rates ─────────────────────────────────────────────────────────────────────
+function applyRatesUI() {
+    const packed = document.getElementById('rate-packed');
+    const ret    = document.getElementById('rate-returned');
+    const po     = document.getElementById('rate-po');
+    const custom = document.getElementById('rate-custom');
+    if (packed) packed.textContent = `Rs.${RATES.packed_weekday} / Rs.${RATES.packed_weekend}`;
+    if (ret)    ret.textContent    = `Rs.${RATES.returned} flat`;
+    if (po)     po.textContent     = `Rs.${RATES.po} / unit`;
+    if (custom) custom.textContent = `Rs.${RATES.custom} / order`;
+}
+
+function populateRateInputs() {
+    const ids = {
+        mRateWeekday: 'packed_weekday',
+        mRateWeekend: 'packed_weekend',
+        mRateReturned: 'returned',
+        mRatePo: 'po',
+        mRateCustom: 'custom',
+    };
+    Object.keys(ids).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = RATES[ids[id]] !== undefined ? RATES[ids[id]] : '';
+    });
+}
+
+function readRateInputs() {
+    return {
+        packed_weekday: parseFloat(document.getElementById('mRateWeekday').value),
+        packed_weekend: parseFloat(document.getElementById('mRateWeekend').value),
+        returned:       parseFloat(document.getElementById('mRateReturned').value),
+        po:             parseFloat(document.getElementById('mRatePo').value),
+        custom:         parseFloat(document.getElementById('mRateCustom').value),
+    };
+}
+
+async function saveRates() {
+    const rates = readRateInputs();
+    Object.assign(RATES, rates);
+    currentSettings = Object.assign({}, currentSettings || {}, { rates });
+    applyRatesUI();
+    try {
+        if (API_MODE === 'supabase') {
+            const latest = await fetchLatestPayload().catch(() => ({}));
+            const payload = latest || {};
+            payload.entries = entries;
+            payload.settings = currentSettings;
+            await pushPayload(payload);
+        } else {
+            await fetch('/api/accountant/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rates })
+            });
+        }
+        showToast('Rates saved');
+    } catch(e) {
+        console.warn('Rates save failed:', e);
+        showToast('Failed to save rates');
+    }
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 function renderAll() {
     let total = 0, bPacked = 0, bReturned = 0, bPo = 0, bCustom = 0;
@@ -745,15 +914,47 @@ function confirmDeleteAll() {
 }
 
 // ── Export ────────────────────────────────────────────────────────────────────
-function exportCSV() {
+function buildCSV() {
     const rows = [['Date','Day','Type','Qty','Earnings']];
     entries.forEach(e => rows.push([e.display, e.dayName, TYPE_LABELS[e.type], e.qty, e.earnings]));
-    const csv = rows.map(r => r.join(',')).join('\n');
-    downloadFile('accountant.csv', 'text/csv', csv);
+    return rows.map(r => r.join(',')).join('\n');
 }
-function exportJSON() {
-    downloadFile('accountant.json', 'application/json', JSON.stringify({ entries }, null, 2));
+
+async function exportCSV() {
+    const content = buildCSV();
+    if (API_MODE === 'supabase') {
+        await shareFile('accountant.csv', 'text/csv', content);
+    } else {
+        downloadFile('accountant.csv', 'text/csv', content);
+    }
 }
+
+async function exportJSON() {
+    const content = JSON.stringify({ entries, settings: currentSettings || {} }, null, 2);
+    if (API_MODE === 'supabase') {
+        await shareFile('accountant.json', 'application/json', content);
+    } else {
+        downloadFile('accountant.json', 'application/json', content);
+    }
+}
+
+async function shareFile(name, type, content) {
+    try {
+        const Filesystem = (await import('@capacitor/filesystem')).Filesystem;
+        const Share      = (await import('@capacitor/share')).Share;
+        const base64     = btoa(unescape(encodeURIComponent(content)));
+        const file       = await Filesystem.writeFile({
+            path: name,
+            data: base64,
+            directory: Filesystem.Directory.Cache,
+        });
+        await Share.share({ title: name, files: [file.uri] });
+    } catch(e) {
+        console.warn('Share failed, falling back to download:', e);
+        downloadFile(name, type, content);
+    }
+}
+
 function downloadFile(name, type, content) {
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([content], { type }));
@@ -764,8 +965,8 @@ function downloadFile(name, type, content) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 hydrate();
 
-// Register service worker
-if ('serviceWorker' in navigator) {
+// Register service worker (web/PWA mode only)
+if (!IS_CAPACITOR && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('/static/sw.js').catch(e => console.warn('SW:', e));
 }
 </script>

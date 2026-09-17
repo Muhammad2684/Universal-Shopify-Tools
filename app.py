@@ -83,6 +83,7 @@ ROUTE_PERMISSIONS = {
     '/api/dashboard':    None, # Special handling for dashboard
     '/deduct':           'has_qty_deduction',
     '/accountant':       'has_accountant',
+    '/mobile/accountant': 'has_accountant',
 }
 
 def boot_active_profile():
@@ -2060,24 +2061,119 @@ ACCOUNTANT_DEFAULT_RATES = {
     'custom':        100,
 }
 
-def load_accountant_data():
+# ── Supabase sync (optional) ─────────────────────────────────────────────────
+# If SUPABASE_URL + SUPABASE_ANON_KEY are configured (via .env or
+# BASE_DIR/supabase.json), accountant data is stored in Supabase (single
+# JSON-document row) with the local accountant_data.json kept as an
+# offline cache. Otherwise behaviour is unchanged (local file only).
+SUPABASE_TABLE       = 'accountant_data'
+SUPABASE_CONFIG_FILE = os.path.join(BASE_DIR, 'supabase.json')
+
+def supabase_credentials():
+    url = (os.environ.get('SUPABASE_URL', '') or '').strip().rstrip('/')
+    key = (os.environ.get('SUPABASE_ANON_KEY', '') or '').strip()
+    if (not url or not key) and os.path.exists(SUPABASE_CONFIG_FILE):
+        try:
+            with open(SUPABASE_CONFIG_FILE, 'r') as f:
+                cfg = json.load(f)
+            url = url or (cfg.get('url') or '').strip().rstrip('/')
+            key = key or (cfg.get('anon_key') or cfg.get('key') or '').strip()
+        except Exception:
+            pass
+    return url, key
+
+def supabase_configured():
+    url, key = supabase_credentials()
+    return bool(url and key)
+
+def _supabase_get_payload():
+    url, key = supabase_credentials()
+    r = requests.get(
+        f"{url}/rest/v1/{SUPABASE_TABLE}",
+        params={'select': 'payload', 'id': 'eq.1'},
+        headers={
+            'apikey': key,
+            'Authorization': f'Bearer {key}',
+            'Accept': 'application/json',
+        },
+        timeout=10,
+    )
+    r.raise_for_status()
+    rows = r.json()
+    if not rows:
+        return None
+    return rows[0].get('payload')
+
+def _supabase_upsert_payload(payload):
+    url, key = supabase_credentials()
+    body = {
+        'id': 1,
+        'payload': payload,
+        'updated_at': datetime.datetime.utcnow().isoformat() + 'Z',
+    }
+    r = requests.post(
+        f"{url}/rest/v1/{SUPABASE_TABLE}",
+        params={'on_conflict': 'id'},
+        headers={
+            'apikey': key,
+            'Authorization': f'Bearer {key}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Prefer': 'resolution=merge-duplicates,return=minimal',
+        },
+        json=body,
+        timeout=10,
+    )
+    r.raise_for_status()
+    return True
+
+def _load_accountant_local():
     if os.path.exists(ACCOUNTANT_FILE):
         try:
             with open(ACCOUNTANT_FILE, 'r') as f:
                 data = json.load(f)
-                if not isinstance(data, dict):
-                    data = {}
+                if isinstance(data, dict):
+                    return data
         except Exception:
-            data = {}
-    else:
+            pass
+    return {}
+
+def _save_accountant_local(data):
+    with open(ACCOUNTANT_FILE, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def load_accountant_data():
+    data = None
+    if supabase_configured():
+        try:
+            data = _supabase_get_payload()
+        except Exception as e:
+            print(f"[ACCOUNTANT] Supabase read failed, using local cache: {e}")
+            data = None
+        if data is not None:
+            try:
+                _save_accountant_local(data)
+            except Exception:
+                pass
+    if data is None:
+        data = _load_accountant_local()
+    if not isinstance(data, dict):
         data = {}
     data.setdefault('settings', {})
     data['settings'].setdefault('rates', dict(ACCOUNTANT_DEFAULT_RATES))
     return data
 
 def save_accountant_data(data):
-    with open(ACCOUNTANT_FILE, 'w') as f:
-        json.dump(data, f, indent=2)
+    _save_accountant_local(data)
+    if supabase_configured():
+        try:
+            _supabase_upsert_payload(data)
+        except Exception as e:
+            print(f"[ACCOUNTANT] Supabase write failed: {e}")
+
+@app.route('/mobile/accountant')
+def accountant_mobile():
+    return render_template('accountant_mobile.html')
 
 @app.route('/accountant')
 def accountant():

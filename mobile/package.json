@@ -1,0 +1,18 @@
+{
+  "name": "nafees-accountant",
+  "version": "1.0.0",
+  "description": "Nafees Accountant — mobile APK (Capacitor) backed by Supabase",
+  "private": true,
+  "scripts": {
+    "sync:www": "node sync-www.js",
+    "cap": "cap",
+    "sync": "npm run sync:www && cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.0.0",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/filesystem": "^8.1.3",
+    "@capacitor/share": "^8.0.2"
+  }
+}
