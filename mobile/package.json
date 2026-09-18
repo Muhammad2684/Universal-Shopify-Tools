@@ -1,7 +1,7 @@
 {
   "name": "nafees-accountant",
   "version": "1.0.0",
-  "description": "Nafees Accountant — mobile APK (Capacitor) backed by Supabase",
+  "description": "USHT — mobile APK (Capacitor) backed by Supabase",
   "private": true,
   "scripts": {
     "sync:www": "node sync-www.js",

@@ -1,12 +1,12 @@
 {
-  "name": "Nafees USHT",
-  "short_name": "Nafees",
-  "description": "Universal SH Tools — Shopify Store Manager",
+  "name": "USHT",
+  "short_name": "USHT",
+  "description": "Universal Shopify Tools — My Accountant (mobile)",
   "start_url": "/mobile/accountant",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0a0a14",
-  "theme_color": "#0a0a14",
+  "background_color": "#0f0f1d",
+  "theme_color": "#0f0f1d",
   "icons": [
     {
       "src": "/static/icons/icon-192.png",
