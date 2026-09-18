@@ -18,6 +18,12 @@ import hmac, hashlib, base64, secrets
 from flask import session
 from dotenv import load_dotenv  
 load_dotenv()
+if getattr(sys, 'frozen', False):
+    _frozen_dirs = [os.path.dirname(sys.executable)]
+    if hasattr(sys, '_MEIPASS') and sys._MEIPASS:
+        _frozen_dirs.append(sys._MEIPASS)
+    for _d in _frozen_dirs:
+        load_dotenv(os.path.join(_d, '.env'), override=False)
 
 # ── PyInstaller path resolution ──────────────────────────────────────────────
 if getattr(sys, 'frozen', False):
@@ -209,7 +215,7 @@ def auth_callback():
 # VERSION / AUTO-UPDATE
 # ════════════════════════════════════════════════════════════════════════════
 
-APP_VERSION = "1.3.3"
+APP_VERSION = "1.3.4"
 VERSION_URL = "https://raw.githubusercontent.com/Muhammad2684/Universal-Shopify-Tools/main/version.json"
 
 _update_state = {"status": "idle", "percent": 0, "error": ""}

@@ -1,5 +1,5 @@
 {
-  "version": "1.3.3",
-  "notes": "Add: mobile accountant import CSV/JSON + refresh button; Supabase sync for My Accountant (rates/config in Settings); build APK workflow",
-  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.3/USHT.exe"
+  "version": "1.3.4",
+  "notes": "Fix: Supabase connection in packaged app (loads .env from exe + bundled path); mobile accountant import CSV/JSON + refresh; Supabase sync",
+  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.4/USHT.exe"
 }
