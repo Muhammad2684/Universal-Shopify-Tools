@@ -1,5 +1,7 @@
 import os
 import json
+import threading
+import time
 import requests
 import datetime
 import csv
@@ -176,6 +178,41 @@ def get_rest_url():
 
 def credentials_ok():
     return bool(SHOPIFY_STORE_URL() and SHOPIFY_ACCESS_TOKEN())
+
+# ── Shared HTTP session for Shopify Admin API ───────────────────────────────
+# Reuses TCP/TLS connections (keep-alive pool) instead of opening a new one
+# per call, retries transient GET failures / 429s, and always applies timeouts.
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+
+SHOPIFY_TIMEOUT = (5, 20)  # (connect, read) seconds
+
+def _build_shopify_session():
+    session = requests.Session()
+    retry = Retry(
+        total=2, connect=2, read=2,
+        backoff_factor=0.4,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(pool_connections=10, pool_maxsize=20, max_retries=retry)
+    session.mount('https://', adapter)
+    return session
+
+SHOPIFY_HTTP = _build_shopify_session()
+
+def shopify_get(url, **kwargs):
+    kwargs.setdefault('timeout', SHOPIFY_TIMEOUT)
+    return SHOPIFY_HTTP.get(url, **kwargs)
+
+def shopify_post(url, **kwargs):
+    kwargs.setdefault('timeout', SHOPIFY_TIMEOUT)
+    return SHOPIFY_HTTP.post(url, **kwargs)
+
+def shopify_put(url, **kwargs):
+    kwargs.setdefault('timeout', SHOPIFY_TIMEOUT)
+    return SHOPIFY_HTTP.put(url, **kwargs)
 
 # ════════════════════════════════════════════════════════════════════════════
 # Shopify Auth
@@ -380,73 +417,147 @@ def fetch_order_data(order_identifier):
         return None, "No store profile active. Use the Store button in the nav to add one.", 500
 
     headers = get_headers()
-    shopify_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders.json"
-    params = {"status": "any"}
-    is_tracking_search = not (order_identifier.isdigit() or order_identifier.startswith("#"))
-    if not is_tracking_search:
-        params["name"] = f"#{order_identifier}" if not str(order_identifier).startswith("#") else order_identifier
+    base_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}"
+    orders_url = f"{base_url}/orders.json"
+    ident = str(order_identifier).strip()
 
-    response = requests.get(shopify_url, headers=headers, params=params)
+    is_tracking_search = not (ident.isdigit() or ident.startswith("#"))
+
+    def _tracking_lookup():
+        """Locate an order by tracking number: lightweight id pass, then full fetch."""
+        resp = shopify_get(orders_url, headers=headers,
+                           params={"status": "any", "limit": 250,
+                                   "fields": "id,name,tags,fulfillments"})
+        resp.raise_for_status()
+        for o in resp.json().get("orders", []):
+            if any(ident == f.get("tracking_number") for f in o.get("fulfillments", [])):
+                full = shopify_get(f"{base_url}/orders/{o['id']}.json", headers=headers)
+                full.raise_for_status()
+                got = full.json().get("orders", [])
+                return got[0] if got else None
+        return None
+
+    params = {"status": "any"}
+    if not is_tracking_search:
+        params["name"] = ident if ident.startswith("#") else f"#{ident}"
+
+    response = shopify_get(orders_url, headers=headers, params=params)
     response.raise_for_status()
     orders = response.json().get("orders", [])
 
     order = None
     if is_tracking_search:
-        for o in orders:
-            if any(order_identifier == f.get("tracking_number") for f in o.get("fulfillments", [])):
-                order = o
-                break
+        order = _tracking_lookup()
     elif orders:
         order = orders[0]
+    elif ident.isdigit():
+        # All-digit identifier that matched no order name — could be a numeric
+        # tracking number, so retry it through the tracking search path.
+        order = _tracking_lookup()
 
     if not order:
         return None, "Order not found", 404
 
-    line_items = []
-    image_cache = {}
-    variant_cache = {}
+    raw_items = order.get('line_items', [])
 
-    for item in order.get('line_items', []):
-        product_id = item.get('product_id')
-        variant_id = item.get('variant_id')
-        inventory_item_id = None
-        available_quantity = 0
-        in_stock = False
+    # ── Batched enrichment: variants + inventory_item_ids + images ──────────
+    # One products.json call replaces the old per-line-item variant/product
+    # lookups; one inventory_levels call replaces the per-item inventory calls.
+    product_ids = sorted({i.get('product_id') for i in raw_items if i.get('product_id')})
+    variant_ids = {i.get('variant_id') for i in raw_items if i.get('variant_id')}
+    variant_to_inventory = {}
+    product_images = {}
+    got_products = False
+    got_inventory = False
 
-        if variant_id:
-            if variant_id in variant_cache:
-                inventory_item_id = variant_cache[variant_id]
-            else:
-                variant_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/variants/{variant_id}.json"
-                variant_resp = requests.get(variant_url, headers=headers)
-                if variant_resp.status_code == 200:
-                    variant_data = variant_resp.json().get("variant", {})
-                    inventory_item_id = variant_data.get("inventory_item_id")
-                    variant_cache[variant_id] = inventory_item_id
+    if product_ids:
+        try:
+            for start in range(0, len(product_ids), 250):
+                chunk = product_ids[start:start + 250]
+                resp = shopify_get(f"{base_url}/products.json", headers=headers,
+                                   params={"ids": ",".join(map(str, chunk)),
+                                           "fields": "id,variants,images"})
+                resp.raise_for_status()
+                for p in resp.json().get("products", []):
+                    for v in p.get("variants", []):
+                        if v.get("id"):
+                            variant_to_inventory[v["id"]] = v.get("inventory_item_id")
+                    product_images[p.get("id")] = p.get("images") or []
+            got_products = True
+        except Exception as e:
+            print(f"[SAP] batch products.json failed, falling back to per-item lookups: {e}")
 
-        if inventory_item_id:
-            inventory_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/inventory_levels.json"
-            inv_params = {"inventory_item_ids": [str(inventory_item_id)]}
+    # Orphan variants (product_id missing/unknown) are fetched individually.
+    for vid in sorted(variant_ids - set(variant_to_inventory)):
+        try:
+            vr = shopify_get(f"{base_url}/variants/{vid}.json", headers=headers)
+            if vr.status_code == 200:
+                variant_to_inventory[vid] = vr.json().get("variant", {}).get("inventory_item_id")
+        except Exception:
+            pass
+
+    if not got_products:
+        # Legacy path: per-product image lookups (previous behaviour).
+        for pid in product_ids:
+            if pid in product_images:
+                continue
             try:
-                inv_resp = requests.get(inventory_url, headers=headers, params=inv_params)
-                inv_resp.raise_for_status()
-                levels = inv_resp.json().get("inventory_levels", [])
-                if levels:
-                    available_quantity = sum(l.get("available", 0) for l in levels if l.get("available") is not None)
-                    in_stock = available_quantity > 0
+                pr = shopify_get(f"{base_url}/products/{pid}.json", headers=headers,
+                                 params={"fields": "images"})
+                if pr.status_code == 200:
+                    product_images[pid] = pr.json().get("product", {}).get("images") or []
             except Exception:
                 pass
 
-        if product_id and product_id not in image_cache:
-            product_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/products/{product_id}.json?fields=images"
-            prod_resp = requests.get(product_url, headers=headers)
-            if prod_resp.status_code == 200:
-                product_data = prod_resp.json().get("product")
-                if product_data and product_data.get("images"):
-                    image_url = next((img["src"] for img in product_data["images"] if variant_id in img.get("variant_ids", [])), None)
-                    if not image_url:
-                        image_url = product_data["images"][0].get("src")
-                    image_cache[product_id] = image_url
+    inventory_item_ids = sorted({v for v in variant_to_inventory.values() if v})
+    available_by_item = {}
+    if inventory_item_ids:
+        try:
+            for start in range(0, len(inventory_item_ids), 100):
+                chunk = inventory_item_ids[start:start + 100]
+                resp = shopify_get(f"{base_url}/inventory_levels.json", headers=headers,
+                                   params={"inventory_item_ids": ",".join(map(str, chunk))})
+                resp.raise_for_status()
+                for lvl in resp.json().get("inventory_levels", []):
+                    iid = lvl.get("inventory_item_id")
+                    qty = lvl.get("available")
+                    if iid and qty is not None:
+                        available_by_item[iid] = available_by_item.get(iid, 0) + qty
+            got_inventory = True
+        except Exception as e:
+            print(f"[SAP] batch inventory_levels failed, falling back to per-item lookups: {e}")
+
+    if not got_inventory:
+        # Legacy path: per-item inventory lookups (previous behaviour).
+        for iid in inventory_item_ids:
+            try:
+                inv_resp = shopify_get(f"{base_url}/inventory_levels.json", headers=headers,
+                                       params={"inventory_item_ids": str(iid)})
+                inv_resp.raise_for_status()
+                levels = inv_resp.json().get("inventory_levels", [])
+                if levels:
+                    available_by_item[iid] = sum(
+                        l.get("available", 0) for l in levels if l.get("available") is not None
+                    )
+            except Exception:
+                pass
+
+    def _pick_image(product_id, variant_id):
+        images = product_images.get(product_id) or []
+        if not images:
+            return None
+        for img in images:
+            if variant_id in (img.get("variant_ids") or []):
+                return img.get("src")
+        return images[0].get("src")
+
+    line_items = []
+    for item in raw_items:
+        product_id = item.get('product_id')
+        variant_id = item.get('variant_id')
+        inventory_item_id = variant_to_inventory.get(variant_id)
+        available_quantity = available_by_item.get(inventory_item_id, 0) if inventory_item_id else 0
+        in_stock = available_quantity > 0
 
         properties = item.get('properties', [])
         customized_name = next(
@@ -465,7 +576,7 @@ def fetch_order_data(order_identifier):
             "quantity":           item.get('quantity'),
             "sku":                item.get('sku'),
             "size":               item.get('variant_title'),
-            "product_image":      image_cache.get(product_id),
+            "product_image":      _pick_image(product_id, variant_id),
             "in_stock":           in_stock,
             "available_quantity": available_quantity,
             "customized_name":    customized_name,
@@ -491,6 +602,56 @@ def fetch_order_data(order_identifier):
 def make_session_permanent():
     session.permanent = True
 
+# ════════════════════════════════════════════════════════════════════════════
+# LICENSE RE-VALIDATION (cached — was one remote call per request)
+# ════════════════════════════════════════════════════════════════════════════
+LICENSE_REVALIDATE_TTL = 120  # seconds between remote re-validations
+_license_check_lock = threading.Lock()
+_license_last_attempt = 0.0   # time.monotonic() of the last spawned attempt
+
+def revalidate_license_async():
+    """Refresh license.json from the license server at most once per TTL,
+    in a background thread, so requests never block on the remote call."""
+    global _license_last_attempt
+    if time.monotonic() - _license_last_attempt < LICENSE_REVALIDATE_TTL:
+        return
+    if not _license_check_lock.acquire(blocking=False):
+        return  # a refresh is already in flight
+    _license_last_attempt = time.monotonic()
+
+    def _worker():
+        try:
+            lic = load_license()
+            if not lic:
+                return
+            try:
+                resp = requests.post(
+                    f'{LICENSE_SERVER}/api/validate',
+                    json={'key': lic['key']},
+                    timeout=5
+                )
+                data = resp.json()
+            except Exception:
+                return  # Server unreachable — keep current license (offline tolerance)
+            if not data.get('valid'):
+                clear_license()
+                return
+            save_license({
+                'key':         lic['key'],
+                'plan':        data['plan'],
+                'label':       data['label'],
+                'expires_at':  data.get('expires_at'),
+                'customer':    data.get('customer', ''),
+                'free_trial':  data.get('free_trial', False),
+                'permissions': data.get('permissions', {}),
+            })
+        except Exception:
+            pass
+        finally:
+            _license_check_lock.release()
+
+    threading.Thread(target=_worker, daemon=True).start()
+
 @app.before_request
 def check_license():
     allowed = ['/license', '/api/license/validate', '/api/license/clear', '/static', '/auth', '/auth/callback', '/api/debug_license']
@@ -502,28 +663,9 @@ def check_license():
     if not lic:
         return redirect('/license')
 
-    # Re-validate license
-    try:
-        resp = requests.post(
-            'https://usht.pythonanywhere.com/api/validate',
-            json={'key': lic['key']},
-            timeout=5
-        )
-        data = resp.json()
-        if not data.get('valid'):
-            clear_license()
-            return redirect('/license')
-        save_license({
-            'key':         lic['key'],
-            'plan':        data['plan'],
-            'label':       data['label'],
-            'expires_at':  data.get('expires_at'),
-            'customer':    data.get('customer', ''),
-            'free_trial':  data.get('free_trial', False),
-            'permissions': data.get('permissions', {}),
-        })
-    except Exception:
-        pass
+    # Refresh the cache in the background (at most once per TTL) instead of
+    # hitting the license server on every single request.
+    revalidate_license_async()
 
     # Check store connection
     if 'access_token' not in session:
@@ -803,15 +945,35 @@ def tag_order_as_packed(order_id):
         return jsonify({"error": "No store profile active."}), 500
     headers = get_headers()
     order_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders/{order_id}.json"
+    today = datetime.date.today().strftime("%d-%m-%Y")
+    packed_tag = f"Packed {today}"
+
+    # Preferred: one atomic tagsAdd mutation — single round trip, no
+    # read-modify-write race on the tags string.
     try:
-        response = requests.get(order_url, headers=headers, params={"fields": "tags"})
+        mutation = (
+            'mutation { tagsAdd(id: "gid://shopify/Order/' + str(order_id)
+            + '", tags: ["' + packed_tag + '"]) { userErrors { field message } } }'
+        )
+        resp = shopify_post(get_graphql_url(), headers=headers, json={'query': mutation})
+        resp.raise_for_status()
+        payload = resp.json()
+        tags_add = (payload.get('data') or {}).get('tagsAdd')
+        problems = payload.get('errors') or (tags_add or {}).get('userErrors') or []
+        if tags_add and not problems:
+            return jsonify({"message": "Order tagged successfully", "tag": packed_tag})
+        print(f"[SAP] tagsAdd rejected, falling back to REST: {payload}")
+    except Exception as e:
+        print(f"[SAP] tagsAdd failed, falling back to REST: {e}")
+
+    # Fallback: previous behaviour — read existing tags, then write them back.
+    try:
+        response = shopify_get(order_url, headers=headers, params={"fields": "tags"})
         response.raise_for_status()
         order = response.json().get('order')
         existing_tags = order.get("tags", "")
-        today = datetime.date.today().strftime("%d-%m-%Y")
-        packed_tag = f"Packed {today}"
         updated_tags = f"{existing_tags}, {packed_tag}".strip(", ")
-        update_response = requests.put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
+        update_response = shopify_put(order_url, headers=headers, json={"order": {"id": order_id, "tags": updated_tags}})
         update_response.raise_for_status()
         return jsonify({"message": "Order tagged successfully", "tag": packed_tag})
     except requests.exceptions.HTTPError as e:
@@ -828,7 +990,7 @@ def save_order_note(order_id):
     headers = get_headers()
     order_url = f"https://{SHOPIFY_STORE_URL()}/admin/api/{SHOPIFY_API_VERSION()}/orders/{order_id}.json"
     try:
-        update_response = requests.put(
+        update_response = shopify_put(
             order_url, headers=headers,
             json={"order": {"id": order_id, "note": note}}
         )
@@ -1010,7 +1172,7 @@ def get_graphql_url():
 
 def run_graphql_query(query):
     try:
-        response = requests.post(get_graphql_url(), headers=get_headers(), json={'query': query})
+        response = shopify_post(get_graphql_url(), headers=get_headers(), json={'query': query})
         response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:

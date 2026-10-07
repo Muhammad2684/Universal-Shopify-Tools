@@ -26,6 +26,8 @@ let packedOrders = [];
 let currentOrder = null;
 let itemCounters = {};
 let isPacking = false;
+let fetchSeq = 0;           // monotonic token — stale responses are discarded
+let fetchController = null; // aborts the previous in-flight order fetch
 
 // ════════════════════════════════════════════════════════════════════════════
 // AUTO MARK TOGGLE
@@ -50,9 +52,12 @@ function onAutoMarkChange() {
 }
 
 const SESSION_KEY = 'scanpack_state';
+const STATE_SCHEMA = 2; // counters are keyed by line index since v2
 
 function saveState() {
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ packedOrders, currentOrder, itemCounters }));
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({
+        schema: STATE_SCHEMA, packedOrders, currentOrder, itemCounters
+    }));
 }
 
 function loadState() {
@@ -62,12 +67,23 @@ function loadState() {
         const state = JSON.parse(raw);
         packedOrders = state.packedOrders || [];
         currentOrder = state.currentOrder || null;
-        itemCounters = state.itemCounters || {};
+        // Older sessions keyed counters by variant_id — reset them rather than
+        // mis-apply them to the new line-index scheme.
+        itemCounters = (state.schema === STATE_SCHEMA && state.itemCounters) ? state.itemCounters : {};
     } catch(e) {}
 }
 
 function restoreUI() {
     updatePackedOrdersUI();
+    if (!currentOrder) return;
+    renderOrderItems();
+    checkPackingCompletion();
+}
+
+// Single renderer for the order detail pane — used by both a fresh fetch and
+// a session restore. Counters are keyed by line-item index so duplicate
+// variants in one order can't collide.
+function renderOrderItems() {
     if (!currentOrder) return;
 
     orderNameSpan.textContent = currentOrder.order_name;
@@ -76,11 +92,13 @@ function restoreUI() {
     itemList.innerHTML = '';
     updateNotesDisplay(currentOrder.note || '');
 
-    currentOrder.line_items.forEach(item => {
+    currentOrder.line_items.forEach((item, idx) => {
         if (item.removed) return;
-        const qty = item.quantity || 1;
+        if (!(idx in itemCounters)) itemCounters[idx] = 0;
+
         const li = document.createElement('li');
         li.dataset.variantId = item.variant_id;
+        li.dataset.lineIndex = idx;
 
         const imageHtml = item.product_image
             ? `<img src="${item.product_image}" alt="${item.title}" style="width: 70px; height: auto; margin-right: 10px; cursor: zoom-in; border-radius: 13px;" onclick="openImageModal('${item.product_image}')">`
@@ -94,10 +112,10 @@ function restoreUI() {
                     <span>Size: ${item.size || 'N/A'}</span><br>
                     ${item.customized_name ? `<span>Customized Name: ${item.customized_name}</span><br>` : ''}
                     <div style="display: flex; align-items: center;">
-                        <span class="item-quantity">Packed: <span id="packed-${item.variant_id}">0</span> / ${qty}</span>
+                        <span class="item-quantity">Packed: <span id="packed-${idx}">0</span> / ${item.quantity || 1}</span>
                         <div class="counter-controls">
-                            <button onclick="decrementQuantity('${item.variant_id}')">-</button>
-                            <button onclick="incrementQuantity('${item.variant_id}')">+</button>
+                            <button onclick="decrementQuantity(${idx})">-</button>
+                            <button onclick="incrementQuantity(${idx})">+</button>
                         </div>
                     </div>
                 </div>
@@ -110,17 +128,11 @@ function restoreUI() {
         }
 
         itemList.appendChild(li);
-
-        const packedSpan = document.getElementById(`packed-${item.variant_id}`);
-        if (packedSpan) {
-            packedSpan.textContent = itemCounters[item.variant_id] || 0;
-            if (itemCounters[item.variant_id] === item.quantity) li.classList.add('packed');
-        }
+        updateItemDisplay(idx);
     });
 
     renderRemovedItems(currentOrder.line_items);
     orderDetailsDiv.style.display = 'block';
-    checkPackingCompletion();
 }
 
 orderIdInput.addEventListener('keypress', function (event) {
@@ -181,6 +193,13 @@ async function fetchOrder() {
     const orderIdentifier = orderIdInput.value.trim();
     if (!orderIdentifier) { showMessage("Please scan or enter an Order ID/Number.", "error"); return; }
 
+    // A new scan takes over: abort whatever is still in flight and make sure
+    // only the latest request may touch the UI.
+    const seq = ++fetchSeq;
+    if (fetchController) fetchController.abort();
+    const controller = new AbortController();
+    fetchController = controller;
+
     clearMessage();
     showMessage("Loading order...", "info");
     orderDetailsDiv.style.display = 'none';
@@ -188,64 +207,24 @@ async function fetchOrder() {
     itemList.innerHTML = '';
 
     try {
-        const response = await fetch(`/api/get_order/${orderIdentifier}`);
+        const response = await fetch(`/api/get_order/${encodeURIComponent(orderIdentifier)}`, { signal: controller.signal });
+        if (seq !== fetchSeq) return;
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Failed to fetch order');
 
-        currentOrder = data;
         const tags = (data.tags || '').toLowerCase().split(',').map(t => t.trim());
         if (tags.some(tag => tag.startsWith('packed'))) {
+            // Already packed — don't leave a stale order in state.
+            currentOrder = null;
+            itemCounters = {};
             showMessage(`Order ${data.order_name} is already tagged as Packed.`, "info");
             saveState();
             return;
         }
 
+        currentOrder = data;
         itemCounters = {};
-        orderNameSpan.textContent = currentOrder.order_name;
-        shopifyOrderIdSpan.textContent = currentOrder.order_id;
-        fulfillmentStatusSpan.textContent = "N/A";
-        updateNotesDisplay(currentOrder.note || '');
-
-        currentOrder.line_items.forEach(item => {
-            if (item.removed) return;
-            const qty = item.quantity || 1;
-            itemCounters[item.variant_id] = 0;
-
-            const li = document.createElement('li');
-            li.dataset.variantId = item.variant_id;
-
-            const imageHtml = item.product_image
-                ? `<img src="${item.product_image}" alt="${item.title}" style="width: 70px; height: auto; margin-right: 10px; cursor: zoom-in; border-radius: 13px;" onclick="openImageModal('${item.product_image}')">`
-                : '';
-
-            li.innerHTML = `
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    ${imageHtml}
-                    <div>
-                        <span>${item.title} (SKU: ${item.sku || 'N/A'})</span><br>
-                        <span>Size: ${item.size || 'N/A'}</span><br>
-                        ${item.customized_name ? `<span>Customized Name: ${item.customized_name}</span><br>` : ''}
-                        <div style="display: flex; align-items: center;">
-                            <span class="item-quantity">Packed: <span id="packed-${item.variant_id}">0</span> / ${qty}</span>
-                            <div class="counter-controls">
-                                <button onclick="decrementQuantity('${item.variant_id}')">-</button>
-                                <button onclick="incrementQuantity('${item.variant_id}')">+</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            if (item.quantity > item.available_quantity) {
-                li.style.backgroundColor = 'rgba(255, 0, 0, 0.39)';
-                li.title = `Warning: Not enough stock! Ordered ${item.quantity}, but only ${item.available_quantity ?? 0} available.`;
-            }
-
-            itemList.appendChild(li);
-        });
-
-        renderRemovedItems(currentOrder.line_items);
-        orderDetailsDiv.style.display = 'block';
+        renderOrderItems();
         checkPackingCompletion();
         clearMessage();
         saveState();
@@ -256,12 +235,16 @@ async function fetchOrder() {
         }
 
     } catch (error) {
+        if (seq !== fetchSeq || error.name === 'AbortError') return;
         showMessage(`Error: ${error.message}`, "error");
         playError();
         console.error("Fetch order error:", error);
     } finally {
-        orderIdInput.value = '';
-        orderIdInput.focus();
+        if (seq === fetchSeq) {
+            fetchController = null;
+            orderIdInput.value = '';
+            orderIdInput.focus();
+        }
     }
 }
 
@@ -320,12 +303,13 @@ function openImageModal(imageUrl) {
     imageModal.style.display = "block";
 }
 
-function incrementQuantity(variantId) {
-    const item = currentOrder.line_items.find(i => i.variant_id == variantId);
+function incrementQuantity(lineIndex) {
+    if (!currentOrder) return;
+    const item = currentOrder.line_items[lineIndex];
     if (!item) return;
-    if (itemCounters[variantId] < item.quantity) {
-        itemCounters[variantId]++;
-        updateItemDisplay(variantId);
+    if ((itemCounters[lineIndex] || 0) < item.quantity) {
+        itemCounters[lineIndex] = (itemCounters[lineIndex] || 0) + 1;
+        updateItemDisplay(lineIndex);
         checkPackingCompletion();
         saveState();
     } else {
@@ -333,12 +317,13 @@ function incrementQuantity(variantId) {
     }
 }
 
-function decrementQuantity(variantId) {
-    const item = currentOrder.line_items.find(i => i.variant_id == variantId);
+function decrementQuantity(lineIndex) {
+    if (!currentOrder) return;
+    const item = currentOrder.line_items[lineIndex];
     if (!item) return;
-    if (itemCounters[variantId] > 0) {
-        itemCounters[variantId]--;
-        updateItemDisplay(variantId);
+    if ((itemCounters[lineIndex] || 0) > 0) {
+        itemCounters[lineIndex] = itemCounters[lineIndex] - 1;
+        updateItemDisplay(lineIndex);
         checkPackingCompletion();
         saveState();
     } else {
@@ -346,22 +331,23 @@ function decrementQuantity(variantId) {
     }
 }
 
-function updateItemDisplay(variantId) {
-    const packedCountSpan = document.getElementById(`packed-${variantId}`);
-    if (packedCountSpan) {
-        packedCountSpan.textContent = itemCounters[variantId];
-        const listItem = packedCountSpan.closest('li');
-        const item = currentOrder.line_items.find(i => i.variant_id == variantId);
-        if (itemCounters[variantId] === item.quantity) listItem.classList.add('packed');
-        else listItem.classList.remove('packed');
-    }
+function updateItemDisplay(lineIndex) {
+    const packedCountSpan = document.getElementById(`packed-${lineIndex}`);
+    if (!packedCountSpan || !currentOrder) return;
+    const item = currentOrder.line_items[lineIndex];
+    if (!item) return;
+    packedCountSpan.textContent = itemCounters[lineIndex] || 0;
+    const listItem = packedCountSpan.closest('li');
+    if ((itemCounters[lineIndex] || 0) === item.quantity) listItem.classList.add('packed');
+    else listItem.classList.remove('packed');
 }
 
 function checkPackingCompletion() {
+    if (!currentOrder) { markPackedBtn.disabled = true; return; }
     let allItemsPacked = true;
-    currentOrder.line_items.forEach(item => {
+    currentOrder.line_items.forEach((item, idx) => {
         if (item.removed) return;
-        if (item.quantity > 0 && itemCounters[item.variant_id] !== item.quantity) allItemsPacked = false;
+        if (item.quantity > 0 && (itemCounters[idx] || 0) !== item.quantity) allItemsPacked = false;
     });
     markPackedBtn.disabled = !allItemsPacked;
     if (allItemsPacked) showMessage("All items are packed! Ready to tag order as Packed.", "success");
@@ -581,11 +567,11 @@ function filterPackedList(query) {
 
 function incrementAllItems() {
     if (!currentOrder) return;
-    currentOrder.line_items.forEach(item => {
+    currentOrder.line_items.forEach((item, idx) => {
         if (item.removed) return;
-        if (itemCounters[item.variant_id] < item.quantity) {
-            itemCounters[item.variant_id]++;
-            updateItemDisplay(item.variant_id);
+        if ((itemCounters[idx] || 0) < item.quantity) {
+            itemCounters[idx] = (itemCounters[idx] || 0) + 1;
+            updateItemDisplay(idx);
         }
     });
     saveState();
@@ -593,17 +579,17 @@ function incrementAllItems() {
 
 function getShortItems() {
     if (!currentOrder) return [];
-    return currentOrder.line_items.filter(
-        item => !item.removed && itemCounters[item.variant_id] < item.quantity
-    );
+    return currentOrder.line_items
+        .map((item, idx) => ({ item, idx }))
+        .filter(({ item, idx }) => !item.removed && (itemCounters[idx] || 0) < item.quantity);
 }
 
 function forceCompleteAndMark() {
     if (!currentOrder) return;
-    currentOrder.line_items.forEach(item => {
+    currentOrder.line_items.forEach((item, idx) => {
         if (item.removed) return;
-        itemCounters[item.variant_id] = item.quantity;
-        updateItemDisplay(item.variant_id);
+        itemCounters[idx] = item.quantity;
+        updateItemDisplay(idx);
     });
     checkPackingCompletion();
     saveState();
@@ -615,8 +601,8 @@ function showShortItemsPopup(shortItems) {
         const existing = document.getElementById('fkey-popup');
         if (existing) existing.remove();
 
-        const itemRows = shortItems.map(item => {
-            const have  = itemCounters[item.variant_id];
+        const itemRows = shortItems.map(({ item, idx }) => {
+            const have  = itemCounters[idx] || 0;
             const need  = item.quantity;
             const label = item.title + (item.size ? ` — ${item.size}` : '');
             return `<div style="display:flex;justify-content:space-between;align-items:center;
@@ -705,6 +691,12 @@ document.addEventListener('keydown', function (e) {
         if (notesOpen)    { closeNotesModal(); return; }
         if (searchOpen)   { toggleSearch();    return; }
         if (currentOrder) { clearOrder();      return; }
+    }
+    if (e.key === ' ' && !popupOpen && !notesOpen && !searchOpen
+        && currentOrder && !markPackedBtn.disabled) {
+        e.preventDefault();
+        markOrderAsPacked();
+        return;
     }
     if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
