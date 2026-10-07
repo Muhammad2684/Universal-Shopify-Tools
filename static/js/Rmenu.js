@@ -235,6 +235,20 @@
         let items = (inSelectionMode && OVERRIDE_ITEMS) ? [...OVERRIDE_ITEMS] : [...DEFAULT_ITEMS];
 
         if (isStockPage && targetId && !inSelectionMode) {
+            const productCard = document.querySelector(`[data-product-id="${targetId}"]`);
+            const imageUrl = productCard ? (productCard.dataset.imageUrl || '') : '';
+
+            if (imageUrl) {
+                items.push({
+                    label: 'Copy Product Image',
+                    action: function (id) {
+                        const target = document.querySelector(`[data-product-id="${id}"]`);
+                        copyProductImage(target ? (target.dataset.imageUrl || '') : '');
+                    },
+                    isStock: true
+                });
+            }
+
             items.push({
                 label: 'Select Product',
                 action: function (id) {
@@ -243,7 +257,6 @@
                 isStock: true
             });
 
-            const productCard = document.querySelector(`[data-product-id="${targetId}"]`);
             if (productCard && productCard.querySelector('.comment-text')) {
                 items.push({
                     label: 'Remove Note',
@@ -323,6 +336,64 @@
     }
 
     function hideMenu(menu) { menu.classList.remove('visible'); }
+
+    function notify(message, type) {
+        if (typeof window.showStatus === 'function') {
+            window.showStatus(message, type || 'info');
+        } else if (window.CustomModal) {
+            window.CustomModal.alert('Copy Image', message);
+        }
+    }
+
+    function toPngBlob(blob) {
+        if (/^image\/png$/i.test(blob.type)) return Promise.resolve(blob);
+
+        return new Promise((resolve, reject) => {
+            const objectUrl = URL.createObjectURL(blob);
+            const img = new Image();
+            img.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                canvas.toBlob((out) => out ? resolve(out) : reject(new Error('PNG conversion failed')), 'image/png');
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(objectUrl);
+                reject(new Error('image decode failed'));
+            };
+            img.src = objectUrl;
+        });
+    }
+
+    async function copyProductImage(imageUrl) {
+        if (!imageUrl) {
+            notify('This product has no image', 'error');
+            return;
+        }
+
+        const proxyUrl = '/api/stock/image_proxy?url=' + encodeURIComponent(imageUrl);
+
+        try {
+            const res = await fetch(proxyUrl);
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const blob = await res.blob();
+            if (!/^image\//i.test(blob.type)) throw new Error('not an image');
+            if (!blob.size) throw new Error('empty image');
+
+            if (!navigator.clipboard || typeof ClipboardItem === 'undefined') {
+                throw new Error('clipboard images unsupported');
+            }
+
+            const png = await toPngBlob(blob);
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+            notify('Image copied to clipboard', 'success');
+        } catch (err) {
+            notify('Could not copy image: ' + err.message, 'error');
+        }
+    }
 
     function escapeHtml(text) {
         const div = document.createElement('div');

@@ -5,7 +5,8 @@ import threading
 import requests
 import datetime
 import csv
-from flask import Flask, render_template, jsonify, request, abort, redirect, url_for, send_file
+from flask import Flask, render_template, jsonify, request, abort, redirect, url_for, send_file, Response
+from urllib.parse import urlparse
 import io
 import webview
 from reportlab.lib.pagesizes import letter
@@ -1520,6 +1521,28 @@ def change_category_bulk():
         }), 207
 
     return jsonify({'success': True})
+
+ALLOWED_IMAGE_HOST_SUFFIXES = ('.cdn.shopify.com', '.shopify.com', '.myshopify.com', '.shopifycdn.com')
+
+@app.route('/api/stock/image_proxy', methods=['GET'])
+def stock_image_proxy():
+    """Same-origin image fetch so the browser can read the bytes (clipboard copy)."""
+    image_url = request.args.get('url', '').strip()
+    if not image_url:
+        return jsonify({'success': False, 'error': 'url required'}), 400
+
+    host = urlparse(image_url).hostname or ''
+    if urlparse(image_url).scheme != 'https' or not host.endswith(ALLOWED_IMAGE_HOST_SUFFIXES):
+        return jsonify({'success': False, 'error': 'image host not allowed'}), 403
+
+    try:
+        resp = requests.get(image_url, timeout=20, stream=True)
+        resp.raise_for_status()
+        img = Response(resp.content, mimetype=resp.headers.get('Content-Type', 'image/jpeg'))
+        img.headers['Cache-Control'] = 'public, max-age=86400'
+        return img
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 502
 
 @app.route('/api/update_stock_comment', methods=['POST'])
 def update_stock_comment():

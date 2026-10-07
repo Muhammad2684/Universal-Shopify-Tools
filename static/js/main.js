@@ -8,6 +8,10 @@ const statusMessageDiv = document.getElementById('statusMessage');
 const markPackedBtn = document.getElementById('markPackedBtn');
 const packedOrdersList = document.getElementById('packedOrdersList');
 const packedTotalSpan = document.getElementById('packedTotal');
+const autoMarkInput = document.getElementById('autoMarkInput');
+const autoMarkLabel = autoMarkInput ? autoMarkInput.closest('.auto-mark-toggle') : null;
+
+const AUTO_MARK_KEY = 'scanpack_auto_mark';
 
 const imageModal = document.getElementById("imageModal");
 const modalImage = document.getElementById("modalImage");
@@ -21,6 +25,29 @@ window.onclick = function (event) {
 let packedOrders = [];
 let currentOrder = null;
 let itemCounters = {};
+let isPacking = false;
+
+// ════════════════════════════════════════════════════════════════════════════
+// AUTO MARK TOGGLE
+// ════════════════════════════════════════════════════════════════════════════
+
+function loadAutoMark() {
+    let enabled = false;
+    try { enabled = localStorage.getItem(AUTO_MARK_KEY) === '1'; } catch (e) {}
+    if (autoMarkInput) {
+        autoMarkInput.checked = enabled;
+        if (autoMarkLabel) autoMarkLabel.classList.toggle('active', enabled);
+    }
+}
+
+function onAutoMarkChange() {
+    if (!autoMarkInput) return;
+    try { localStorage.setItem(AUTO_MARK_KEY, autoMarkInput.checked ? '1' : '0'); } catch (e) {}
+    if (autoMarkLabel) autoMarkLabel.classList.toggle('active', autoMarkInput.checked);
+    showMessage(autoMarkInput.checked
+        ? 'Auto Mark Packed is ON — scanning an order will pack it in Shopify immediately.'
+        : 'Auto Mark Packed is OFF — count items, then mark the order as packed.');
+}
 
 const SESSION_KEY = 'scanpack_state';
 
@@ -223,6 +250,11 @@ async function fetchOrder() {
         clearMessage();
         saveState();
 
+        if (autoMarkInput && autoMarkInput.checked) {
+            showMessage(`Auto Mark: packing ${currentOrder.order_name} in Shopify...`, "info");
+            forceCompleteAndMark();
+        }
+
     } catch (error) {
         showMessage(`Error: ${error.message}`, "error");
         playError();
@@ -337,25 +369,28 @@ function checkPackingCompletion() {
 }
 
 async function markOrderAsPacked() {
-    if (!currentOrder || markPackedBtn.disabled) return;
+    if (!currentOrder || markPackedBtn.disabled || isPacking) return;
+    const order = currentOrder;
     clearMessage();
     showMessage("Marking order as Tagged in Shopify...", "info");
     markPackedBtn.disabled = true;
+    isPacking = true;
 
     try {
-        const response = await fetch(`/api/fulfill_order/${currentOrder.order_id}`, {
+        const response = await fetch(`/api/fulfill_order/${order.order_id}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' }
         });
         const data = await response.json();
-        if (!response.ok) { showMessage(data.error || 'Failed to fulfill order', 'error'); return; }
+        if (!response.ok) { showMessage(data.error || 'Failed to fulfill order', 'error'); markPackedBtn.disabled = false; return; }
         playBeep();
-        showMessage(`Order ${currentOrder.order_name} successfully fulfilled!`, "success");
-        addPackedOrder(currentOrder.order_name);
-        clearOrder();
+        showMessage(`Order ${order.order_name} successfully fulfilled!`, "success");
+        addPackedOrder(order.order_name);
+        if (currentOrder === order) clearOrder();
     } catch (error) {
         showMessage(`Error: ${error.message}`, "error");
         playError();
     } finally {
+        isPacking = false;
         orderIdInput.focus();
     }
 }
@@ -648,6 +683,7 @@ async function handleFKey(pressedNum) {
 }
 
 window.onload = () => {
+    loadAutoMark();
     loadState();
     restoreUI();
     orderIdInput.focus();

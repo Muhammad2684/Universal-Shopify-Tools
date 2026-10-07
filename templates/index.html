@@ -7,6 +7,40 @@
     <link rel="icon" href="{{ url_for('static', filename='favicon.png') }}" type="image/png">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
+        /* ── Auto Mark Toggle ────────────────────────────────────────────────────── */
+        .auto-mark-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background-color: var(--bg-secondary);
+            color: var(--text-dark);
+            font-size: 0.85em;
+            font-weight: 600;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+        .auto-mark-toggle:hover {
+            color: #fff;
+            border-color: var(--accent-color);
+        }
+        .auto-mark-toggle input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 0;
+            accent-color: var(--accent-color);
+            cursor: pointer;
+        }
+        .auto-mark-toggle.active {
+            color: #fff;
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
         /* ── Page Loading Bar ─────────────────────────────────────────────────────── */
         .page-loading-bar {
             position: fixed;
@@ -49,9 +83,14 @@
                 <input type="text" id="orderIdInput" placeholder="Scan or type order ID" autofocus>
                 <button onclick="fetchOrder()">Load Order</button>
                 <button onclick="clearOrder()">Clear</button>
+                <label class="auto-mark-toggle" for="autoMarkInput">
+                    <input type="checkbox" id="autoMarkInput" onchange="onAutoMarkChange()">
+                    <span>Auto Mark Packed</span>
+                </label>
                 <span class="shortcut-hint">
-                    <kbd>Enter</kbd> Load &nbsp;&nbsp; <kbd>Space</kbd> Confirm &nbsp;&nbsp; <kbd>Esc</kbd> Clear
+                    <kbd>Enter</kbd> Load &nbsp; <kbd>Space</kbd> Confirm &nbsp; <kbd>Esc</kbd> Clear
                 </span>
+
                 <div id="statusMessage" class="status-message" style="margin-top: 10px;"></div>
             </div>
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.3.5",
-  "notes": "USHT branding: redo button + launch screen on mobile accountant; new native icons & splash; app renamed to USHT",
-  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.5/USHT.exe"
+  "version": "1.3.6",
+  "notes": "Scan & Pack: new Auto Mark Packed toggle (scan-to-pack hands-free) + safer pack flow; Stock: Copy Product Image to clipboard from right-click menu",
+  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.6/USHT.exe"
 }
