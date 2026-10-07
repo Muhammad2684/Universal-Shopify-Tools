@@ -1,5 +1,5 @@
 {
-  "version": "1.3.6",
-  "notes": "Scan & Pack: new Auto Mark Packed toggle (scan-to-pack hands-free) + safer pack flow; Stock: Copy Product Image to clipboard from right-click menu",
-  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.6/USHT.exe"
+  "version": "1.3.7",
+  "notes": "Faster Scan & Pack: order loads use 3 Shopify API calls instead of 16 (pooled connections, no per-request license block); mark-packed is one atomic call; fast-scan race fixes, duplicate-variant counter fix, Space confirm works",
+  "download": "https://github.com/Muhammad2684/Universal-Shopify-Tools/releases/download/v1.3.7/USHT.exe"
 }
